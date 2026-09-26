@@ -104,6 +104,14 @@ export class AskModal extends Modal {
 
   onOpen(): void {
     const { contentEl, modalEl } = this;
+    // Initialize the answer maps HERE, in the same method that reads them, rather
+    // than relying on constructor/class-field init. On the iOS Obsidian WebView
+    // this.selection was arriving undefined at onOpen despite a constructor
+    // assignment (Modal-subclass + esbuild interaction we couldn't pin down) —
+    // assigning immediately before use is immune to whatever happens between
+    // construction and open().
+    this.selection = new Map<number, Set<string>>();
+    this.typed = new Map<number, string>();
     modalEl.addClass("po-ask");
     contentEl.empty();
     contentEl.addClass("po-ask-content");
