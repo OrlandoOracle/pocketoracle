@@ -137,22 +137,31 @@ export class AskModal extends Modal {
       section.createEl("div", { cls: "po-ask-question", text: q.question });
 
       const opts = section.createDiv({ cls: "po-ask-options" });
-      for (const opt of q.options) {
+      q.options.forEach((opt, oi) => {
         const btn = opts.createEl("button", { cls: "po-ask-option" });
+        // --i drives the staggered glide-in cascade (LG signature motion).
+        btn.style.setProperty("--i", String(oi));
+        btn.createEl("div", { cls: "po-ask-num", text: String(oi + 1) });
         btn.createEl("div", { cls: "po-ask-option-label", text: opt.label });
         if (opt.description) {
           btn.createEl("div", { cls: "po-ask-option-desc", text: opt.description });
         }
+        // The ✓ is painted always but hidden by CSS until .is-selected/.confirming.
+        btn.createEl("div", { cls: "po-ask-check", text: "✓" });
         btn.addEventListener("click", () => this.onOptionTap(qi, q, opt.label, btn, opts));
-      }
+      });
 
-      // "Type…" free-text escape hatch (maps to an "Other" answer).
+      // "Type or dictate your own" free-text escape hatch (maps to an "Other"
+      // answer; iOS dictation rides the keyboard mic once the textarea focuses).
       const typeRow = section.createDiv({ cls: "po-ask-typerow" });
-      const typeBtn = typeRow.createEl("button", { cls: "po-ask-type", text: "Type…" });
+      const typeBtn = typeRow.createEl("button", {
+        cls: "po-ask-type",
+        text: "Type or dictate your own",
+      });
       typeBtn.addEventListener("click", () => {
         if (section.querySelector("textarea")) return;
         const ta = section.createEl("textarea", { cls: "po-ask-textarea" });
-        ta.placeholder = "Type an answer…";
+        ta.placeholder = "Type or dictate your answer…";
         ta.addEventListener("input", () => {
           this.typed.set(qi, ta.value);
           // Typing supersedes button selection for this question.
@@ -219,11 +228,22 @@ export class AskModal extends Modal {
     opts.querySelectorAll(".po-ask-option.is-selected").forEach((e) => e.removeClass("is-selected"));
     btn.addClass("is-selected");
     if (this.singleFast) {
-      // Fast path: submit on the tap.
-      this.finish({ kind: "answered", answers: this.buildAnswers() });
+      // Fast path: play the gold tap-flourish, then submit. The brief delay lets
+      // the pop/flash/beat land so choosing "feels satisfying" (the /ask ruling:
+      // full LG motion + brief highlight then close).
+      this.flourish(btn);
+      window.setTimeout(() => this.finish({ kind: "answered", answers: this.buildAnswers() }), 240);
     } else {
       this.refreshSubmit();
     }
+  }
+
+  /** Gold tap-confirm flourish: pop/flash the chosen card + a center ring-pulse
+   *  beat spawned on <body> (survives the modal close, self-removes). */
+  private flourish(btn: HTMLButtonElement): void {
+    btn.addClass("confirming");
+    const beat = document.body.createDiv({ cls: "po-ask-beat" });
+    window.setTimeout(() => beat.remove(), 500);
   }
 
   onClose(): void {
