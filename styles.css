@@ -60,3 +60,160 @@
   font-size: 0.9em;
   line-height: 1.5;
 }
+
+/* ── Ask-loop modal: the native tap-to-answer surface ──────────────────────
+   Claude asks → this pops with big buttons. Oracle-dark identity, tuned for a
+   visually-impaired reader: large type, high contrast, ≥64px tap targets. On a
+   phone it goes full-screen. */
+.modal.po-ask {
+  --po-purple: #c8a2ff;
+  --po-bg: #16111f;
+  --po-fg: #f4f1fb;
+  --po-line: #3a2f56;
+  max-width: 560px;
+}
+
+.po-ask-content {
+  padding: 4px 2px 8px;
+}
+
+.po-ask-brand {
+  color: var(--po-purple);
+  font-size: 0.8em;
+  letter-spacing: 0.04em;
+  opacity: 0.85;
+  margin-bottom: 12px;
+}
+
+.po-ask-q {
+  margin-bottom: 18px;
+}
+
+.po-ask-header {
+  display: inline-block;
+  font-size: 0.72em;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--po-purple);
+  border: 1px solid var(--po-line);
+  border-radius: 5px;
+  padding: 2px 8px;
+  margin-bottom: 8px;
+}
+
+.po-ask-question {
+  font-size: 1.15em;
+  font-weight: 600;
+  line-height: 1.35;
+  margin-bottom: 12px;
+}
+
+.po-ask-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.po-ask-option {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  text-align: left;
+  padding: 12px 16px;
+  border: 1.5px solid var(--po-line);
+  border-radius: 12px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: border-color 0.08s, background 0.08s;
+}
+
+.po-ask-option:active {
+  background: var(--background-modifier-hover);
+}
+
+.po-ask-option.is-selected {
+  border-color: var(--po-purple);
+  background: rgba(200, 162, 255, 0.12);
+}
+
+.po-ask-option-label {
+  font-size: 1.05em;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.po-ask-option-desc {
+  font-size: 0.85em;
+  opacity: 0.7;
+  margin-top: 3px;
+  line-height: 1.3;
+}
+
+.po-ask-typerow {
+  margin-top: 8px;
+}
+
+.po-ask-type {
+  background: transparent;
+  border: none;
+  color: var(--po-purple);
+  font-size: 0.9em;
+  padding: 6px 2px;
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.po-ask-textarea {
+  width: 100%;
+  min-height: 72px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 1em;
+  resize: vertical;
+}
+
+.po-ask-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.po-ask-submit {
+  flex: 1 1 auto;
+  min-height: 56px;
+  border-radius: 12px;
+  font-size: 1.05em;
+  font-weight: 600;
+  background: var(--po-purple);
+  color: #1a1226;
+  border: none;
+  cursor: pointer;
+}
+
+.po-ask-submit:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.po-ask-cancel {
+  min-height: 56px;
+  padding: 0 20px;
+  border-radius: 12px;
+  background: transparent;
+  border: 1.5px solid var(--po-line);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+/* Full-screen on phones so the buttons own the view and the keyboard (when the
+   Type… path is used) doesn't cover them. */
+.is-phone .modal.po-ask {
+  width: 100vw;
+  height: 100dvh;
+  max-width: 100vw;
+  border-radius: 0;
+}

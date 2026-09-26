@@ -5,9 +5,15 @@ import {
   type PocketOracleSettings,
 } from "./settings";
 import { PocketOracleTerminalView, VIEW_TYPE_POCKETORACLE } from "./terminal-view";
+import { AskLoop, deriveBrokerBase } from "./ask/ask-loop";
+
+// Just under the broker's 290 s /po/ask hold, so the modal never outlives the
+// ask it represents.
+const ASK_TTL_MS = 285_000;
 
 export default class PocketOraclePlugin extends Plugin {
   settings: PocketOracleSettings = DEFAULT_SETTINGS;
+  private askLoop: AskLoop | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -28,6 +34,29 @@ export default class PocketOraclePlugin extends Plugin {
     });
 
     this.addSettingTab(new PocketOracleSettingTab(this.app, this));
+
+    // The ask-loop runs at plugin level (not per-pane) so Claude's questions pop
+    // as native tap buttons even when the terminal tab isn't focused.
+    this.startAskLoop();
+  }
+
+  override onunload(): void {
+    this.askLoop?.stop();
+    this.askLoop = null;
+  }
+
+  /** (Re)start the ask-loop from current settings. Idempotent. */
+  startAskLoop(): void {
+    this.askLoop?.stop();
+    this.askLoop = null;
+    if (!this.settings.askLoop) return;
+    const base = this.settings.brokerUrl.trim() || deriveBrokerBase(this.settings.wsUrl);
+    if (!base) return; // not configured yet
+    this.askLoop = new AskLoop(this.app, base, {
+      ttlMs: ASK_TTL_MS,
+      pollMs: this.settings.askPollMs,
+    });
+    this.askLoop.start();
   }
 
   /** Reuse the open terminal leaf if there is one; otherwise open a new tab. */
@@ -63,5 +92,7 @@ export default class PocketOraclePlugin extends Plugin {
       const view = leaf.view;
       if (view instanceof PocketOracleTerminalView) view.settingsChanged(this.settings);
     }
+    // Ask-loop config (enable/broker/poll) can change here — reflect it live.
+    this.startAskLoop();
   }
 }

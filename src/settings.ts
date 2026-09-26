@@ -23,6 +23,20 @@ export interface PocketOracleSettings {
   showKeyBar: boolean;
   /** Copy the terminal selection to the device clipboard automatically (iPad has no auto-copy-on-highlight). */
   copyOnSelect: boolean;
+  /**
+   * The ask-loop: poll the po-broker so Claude Code's AskUserQuestion prompts pop
+   * as native tap-to-answer buttons on THIS device. This is PocketOracle's reason
+   * to exist — steer by tapping, no keyboard. Default on.
+   */
+  askLoop: boolean;
+  /**
+   * Broker base URL (…/po). Leave BLANK to auto-derive from the ttyd wss URL
+   * (wss://host:7890/ws → https://host:7890/po). Set only to point the ask-loop
+   * at a different host than the terminal.
+   */
+  brokerUrl: string;
+  /** Poll interval for /po/pending, ms. Lower = snappier taps, more requests. */
+  askPollMs: number;
 }
 
 export const DEFAULT_SETTINGS: PocketOracleSettings = {
@@ -39,6 +53,9 @@ export const DEFAULT_SETTINGS: PocketOracleSettings = {
   lineHeight: 1.4,
   showKeyBar: true,
   copyOnSelect: true,
+  askLoop: true,
+  brokerUrl: "",
+  askPollMs: 2500,
 };
 
 export class PocketOracleSettingTab extends PluginSettingTab {
@@ -132,6 +149,47 @@ export class PocketOracleSettingTab extends PluginSettingTab {
           this.plugin.settings.copyOnSelect = v;
           await this.plugin.saveSettings();
         }),
+      );
+
+    containerEl.createEl("h3", { text: "Ask-loop (tap-to-answer)" });
+
+    new Setting(containerEl)
+      .setName("Enable ask-loop")
+      .setDesc(
+        "When Claude Code asks a question, pop native tap-to-answer buttons on this device. Steer by tapping — no keyboard.",
+      )
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.askLoop).onChange(async (v) => {
+          this.plugin.settings.askLoop = v;
+          await this.plugin.saveSettings();
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName("Broker URL")
+      .setDesc("Leave blank to auto-derive from the ttyd wss URL (…:7890/po). Set only to use a different host.")
+      .addText((t) =>
+        t
+          .setPlaceholder("https://host:7890/po")
+          .setValue(this.plugin.settings.brokerUrl)
+          .onChange(async (v) => {
+            this.plugin.settings.brokerUrl = v.trim();
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Poll interval")
+      .setDesc("How often to check for new questions, ms. Lower = snappier, more requests.")
+      .addSlider((s) =>
+        s
+          .setLimits(1000, 6000, 500)
+          .setValue(this.plugin.settings.askPollMs)
+          .setDynamicTooltip()
+          .onChange(async (v) => {
+            this.plugin.settings.askPollMs = v;
+            await this.plugin.saveSettings();
+          }),
       );
   }
 }
