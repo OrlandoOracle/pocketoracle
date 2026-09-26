@@ -1,0 +1,26 @@
+/* PocketOracle — Oracle-dark terminal pane. xterm.css is appended at build time
+   (ship.sh) and also injected at runtime, so this file holds only OUR chrome. */
+
+.pocketoracle-view {
+  padding: 0;
+  height: 100%;
+  background: #1a1524;
+}
+
+.pocketoracle-term-host {
+  height: 100%;
+  width: 100%;
+  padding: 6px 8px;
+  box-sizing: border-box;
+}
+
+.pocketoracle-term-host .xterm {
+  height: 100%;
+}
+
+.pocketoracle-msg {
+  padding: 16px;
+  color: var(--text-muted);
+  font-size: 0.9em;
+  line-height: 1.5;
+}
