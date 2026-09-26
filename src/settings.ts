@@ -21,6 +21,8 @@ export interface PocketOracleSettings {
   lineHeight: number;
   /** Minimal on-screen key row for the keys the iPad Magic Keyboard lacks (Esc) + quick nav. */
   showKeyBar: boolean;
+  /** Copy the terminal selection to the device clipboard automatically (iPad has no auto-copy-on-highlight). */
+  copyOnSelect: boolean;
 }
 
 export const DEFAULT_SETTINGS: PocketOracleSettings = {
@@ -36,6 +38,7 @@ export const DEFAULT_SETTINGS: PocketOracleSettings = {
   fontSize: 18,
   lineHeight: 1.4,
   showKeyBar: true,
+  copyOnSelect: true,
 };
 
 export class PocketOracleSettingTab extends PluginSettingTab {
@@ -117,6 +120,16 @@ export class PocketOracleSettingTab extends PluginSettingTab {
       .addToggle((t) =>
         t.setValue(this.plugin.settings.showKeyBar).onChange(async (v) => {
           this.plugin.settings.showKeyBar = v;
+          await this.plugin.saveSettings();
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName("Copy on select")
+      .setDesc("Selecting text in the terminal copies it to this device's clipboard automatically (iPad has no highlight-to-copy).")
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.copyOnSelect).onChange(async (v) => {
+          this.plugin.settings.copyOnSelect = v;
           await this.plugin.saveSettings();
         }),
       );

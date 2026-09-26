@@ -1,6 +1,6 @@
 {
   "name": "obsidian-pocketoracle",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Oracle-branded Claude Code terminal inside Obsidian (xterm.js -> wss ttyd + tmux).",
   "private": true,
   "type": "module",

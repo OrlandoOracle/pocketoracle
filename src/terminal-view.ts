@@ -141,6 +141,16 @@ export class PocketOracleTerminalView extends ItemView {
     this.term = term;
     this.fit = fit;
 
+    // Copy-on-select: the iPad has no highlight-to-copy, so mirror the desktop
+    // behaviour by writing the selection to the device clipboard on pointerup.
+    // pointerup fires once at the end of the drag and carries the transient
+    // user-activation iOS requires for navigator.clipboard.writeText.
+    host.addEventListener("pointerup", () => {
+      if (!this.settings.copyOnSelect) return;
+      const sel = term.getSelection();
+      if (sel) void this.copySelection(sel);
+    });
+
     // Minimal touch key row (Esc etc.) — the keys the iPad Magic Keyboard lacks.
     if (this.settings.showKeyBar) this.buildKeyBar(root);
 
@@ -152,6 +162,31 @@ export class PocketOracleTerminalView extends ItemView {
     // Keep the far pty sized to the pane.
     this.resizeObserver = new ResizeObserver(() => this.refit());
     this.resizeObserver.observe(host);
+  }
+
+  /** Write the terminal selection to the device clipboard, with a legacy fallback. */
+  private async copySelection(text: string): Promise<void> {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+    } catch {
+      /* fall through to the execCommand path below */
+    }
+    // Fallback for webviews without the async clipboard API: a transient textarea.
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    } catch {
+      /* clipboard unavailable — nothing more to do */
+    }
   }
 
   /** Slim on-screen row that injects the keys a hardware iPad keyboard can't. */
