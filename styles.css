@@ -163,10 +163,14 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: flex-start; /* left-align children; Obsidian's button reset centers */
   gap: 6px;
   width: 100%;
   min-height: 64px;
   text-align: left;
+  /* Obsidian's core button style sets white-space:nowrap, which inherits into
+     the label/desc divs and makes them one clipped line. Force normal wrap. */
+  white-space: normal;
   padding: 18px 20px;
   border: 2px solid var(--po-line);
   border-radius: 16px;
@@ -205,13 +209,19 @@
 }
 
 .po-ask-option-label {
+  width: 100%;
+  text-align: left;
+  white-space: normal;
   font-size: 1.15em;
   font-weight: 700;
   line-height: 1.2;
-  padding-right: 40px;
+  padding-right: 44px; /* clear the number badge */
 }
 
 .po-ask-option-desc {
+  width: 100%;
+  text-align: left;
+  white-space: normal;
   font-size: 0.9em;
   opacity: 0.72;
   line-height: 1.3;
