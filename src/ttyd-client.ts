@@ -117,6 +117,24 @@ export class TtydClient {
     return this.opened;
   }
 
+  /** Raw socket state — lets the view detect a zombie/half-open socket that
+   *  never fired onclose (the iOS-backgrounding blank-pane failure mode). */
+  get readyState(): number {
+    return this.ws?.readyState ?? WebSocket.CLOSED;
+  }
+
+  /** Bytes queued but not yet flushed. If this climbs across heartbeats and
+   *  never drains, the underlying TCP is dead even if readyState says OPEN. */
+  get bufferedAmount(): number {
+    return this.ws?.bufferedAmount ?? 0;
+  }
+
+  /** Harmless keepalive / liveness probe: re-assert the current size. ttyd
+   *  accepts a RESIZE anytime and never echoes, so it can't corrupt the pty. */
+  probe(cols: number, rows: number): void {
+    this.sendResize(cols, rows);
+  }
+
   close(): void {
     this.opened = false;
     try {

@@ -52,6 +52,12 @@ const ORACLE_THEME = {
   brightWhite: "#ffffff",
 };
 
+/** Reconnect backoff: start fast, back off to a cap, reset on a clean open. */
+const RECONNECT_FLOOR_MS = 1000;
+const RECONNECT_CAP_MS = 15000;
+/** Liveness watchdog cadence — probe the socket and check it's really draining. */
+const HEARTBEAT_MS = 12000;
+
 /** The minimal touch row: keys the iPad Magic Keyboard lacks (Esc) + fast nav/interrupt. */
 const KEY_BAR: ReadonlyArray<{ label: string; seq: string }> = [
   { label: "Esc", seq: "\x1b" },
@@ -70,6 +76,14 @@ export class PocketOracleTerminalView extends ItemView {
   private resizeDebounce: number | null = null;
   private keyBarEl: HTMLElement | null = null;
   private disposed = false;
+
+  // ── P0 reliability floor: keep the pane live, never blank, never stale ──────
+  /** Exponential-backoff delay for the NEXT reconnect; reset to floor on open. */
+  private backoffMs = RECONNECT_FLOOR_MS;
+  /** Liveness watchdog — catches zombie sockets that never fire onclose. */
+  private heartbeatTimer: number | null = null;
+  /** bufferedAmount at the previous heartbeat; a stuck non-zero value = dead TCP. */
+  private lastBuffered = 0;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -174,6 +188,60 @@ export class PocketOracleTerminalView extends ItemView {
     // Keep the far pty sized to the pane.
     this.resizeObserver = new ResizeObserver(() => this.refit());
     this.resizeObserver.observe(host);
+
+    // ── Reliability floor ────────────────────────────────────────────────────
+    // The #1 trust-killer is "blank when I come back": iOS freezes/kills the WS
+    // while Obsidian is backgrounded, and on return a zombie socket can leave the
+    // pane blank with no output. Forcing a reconnect the instant the pane becomes
+    // visible recovers the socket AND pulls a fresh tmux redraw (killing stale
+    // data too). registerDomEvent auto-removes these on view close.
+    this.registerDomEvent(document, "visibilitychange", () => {
+      if (document.visibilityState === "visible") this.forceReconnect();
+    });
+    // A network flap (Wi-Fi ↔ cellular, tunnel re-up) — reconnect on return.
+    this.registerDomEvent(window, "online", () => this.forceReconnect());
+
+    // Watchdog for the foreground case: a socket that goes dead without firing
+    // onclose (readyState stuck, or bytes that never flush).
+    this.heartbeatTimer = window.setInterval(() => this.heartbeat(), HEARTBEAT_MS);
+  }
+
+  /** Tear down and reconnect immediately, resetting the backoff. Used when we
+   *  have positive reason to believe the socket is dead or stale (foreground
+   *  return, network back, watchdog trip) rather than waiting out a backoff. */
+  private forceReconnect(): void {
+    if (this.disposed || !this.term) return;
+    if (this.reconnectTimer != null) {
+      window.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.backoffMs = RECONNECT_FLOOR_MS;
+    this.client?.close();
+    this.client = null;
+    this.connect();
+  }
+
+  /** Liveness probe. Skips while hidden (visibilitychange handles the return).
+   *  If the socket isn't OPEN, or bytes are stuck unflushed across two ticks,
+   *  the connection is dead → force a reconnect. Otherwise send a size probe to
+   *  keep NAT/tunnel state warm and surface a silently-dropped socket. */
+  private heartbeat(): void {
+    if (this.disposed || document.visibilityState !== "visible") return;
+    const client = this.client;
+    if (!client) return;
+    if (client.readyState !== WebSocket.OPEN) {
+      this.forceReconnect();
+      return;
+    }
+    const buffered = client.bufferedAmount;
+    if (buffered > 0 && this.lastBuffered > 0 && buffered >= this.lastBuffered) {
+      // Bytes queued two heartbeats running and not draining → dead TCP.
+      this.lastBuffered = 0;
+      this.forceReconnect();
+      return;
+    }
+    this.lastBuffered = buffered;
+    if (this.term) client.probe(this.term.cols, this.term.rows);
   }
 
   /** Write the terminal selection to the device clipboard, with a legacy fallback. */
@@ -234,6 +302,9 @@ export class PocketOracleTerminalView extends ItemView {
         /* leaf title is our own "Oracle · main"; ignore ttyd's OSC title for now */
       },
       onOpen: () => {
+        // A clean connect resets the backoff so the next drop retries fast.
+        this.backoffMs = RECONNECT_FLOOR_MS;
+        this.lastBuffered = 0;
         // Nudge the far tmux to our real size the instant we're connected.
         this.refit();
       },
@@ -259,12 +330,16 @@ export class PocketOracleTerminalView extends ItemView {
 
   private scheduleReconnect(): void {
     if (this.reconnectTimer != null) return;
+    // Exponential backoff with a cap + jitter so a long outage doesn't hammer
+    // the gateway, but a brief flap still recovers in ~1s.
+    const delay = this.backoffMs + Math.floor(Math.random() * 300);
+    this.backoffMs = Math.min(this.backoffMs * 2, RECONNECT_CAP_MS);
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null;
       this.client?.close();
       this.client = null;
       this.connect();
-    }, 1500);
+    }, delay);
   }
 
   private refit(): void {
@@ -308,6 +383,7 @@ export class PocketOracleTerminalView extends ItemView {
   override async onClose(): Promise<void> {
     this.disposed = true;
     if (this.reconnectTimer != null) window.clearTimeout(this.reconnectTimer);
+    if (this.heartbeatTimer != null) window.clearInterval(this.heartbeatTimer);
     if (this.resizeDebounce != null) window.clearTimeout(this.resizeDebounce);
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
