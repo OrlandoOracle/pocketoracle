@@ -162,6 +162,20 @@ export class AskModal extends Modal {
         if (section.querySelector("textarea")) return;
         const ta = section.createEl("textarea", { cls: "po-ask-textarea" });
         ta.placeholder = "Type or dictate your answer…";
+
+        // The single-select fast path has NO global Submit (an option tap is
+        // what finishes it), so a typed answer would have no way to submit.
+        // Give the textarea its own Send button. In the multi-question path the
+        // global Submit already picks up typed answers, so skip it there.
+        let localSend: HTMLButtonElement | null = null;
+        if (this.singleFast) {
+          localSend = section.createEl("button", { cls: "po-ask-submit po-ask-send", text: "Send" });
+          localSend.disabled = true;
+          localSend.addEventListener("click", () => {
+            if (this.everyAnswered()) this.finish({ kind: "answered", answers: this.buildAnswers() });
+          });
+        }
+
         ta.addEventListener("input", () => {
           this.typed.set(qi, ta.value);
           // Typing supersedes button selection for this question.
@@ -169,6 +183,7 @@ export class AskModal extends Modal {
           opts.querySelectorAll(".po-ask-option.is-selected").forEach((e) =>
             e.removeClass("is-selected"),
           );
+          if (localSend) localSend.disabled = !ta.value.trim();
           this.refreshSubmit();
         });
         // Focus inside the tap handler so iOS raises the keyboard.

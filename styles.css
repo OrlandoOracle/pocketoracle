@@ -353,6 +353,13 @@
   cursor: default;
 }
 
+/* Send button revealed under the textarea in the single-select fast path
+   (that path has no global Submit, so a typed answer needs its own send). */
+.po-ask-send {
+  width: 100%;
+  margin-top: 10px;
+}
+
 .po-ask-cancel {
   min-height: 56px;
   padding: 0 20px;
