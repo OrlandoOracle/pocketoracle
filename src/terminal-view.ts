@@ -4,6 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import xtermCss from "@xterm/xterm/css/xterm.css";
 import { TtydClient } from "./ttyd-client";
+import { registerDisplayControl } from "./display-control";
 import type { PocketOracleSettings } from "./settings";
 
 export const VIEW_TYPE_POCKETORACLE = "pocketoracle-terminal";
@@ -122,6 +123,9 @@ export class PocketOracleTerminalView extends ItemView {
     fit.fit();
     this.term = term;
     this.fit = fit;
+
+    // Let the far shell drive THIS device's Obsidian appearance via OSC 5379.
+    registerDisplayControl(term, this.app);
 
     this.connect();
 
