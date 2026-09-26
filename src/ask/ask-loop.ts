@@ -24,6 +24,13 @@ export class AskLoop {
   private polling = false;
   private stopped = false;
   private modals = new Map<string, AskModal>();
+  /**
+   * qids this device has already surfaced-and-closed (cancel/timeout). The ask
+   * may still be pending on the broker (another device could answer, or its TTL
+   * will expire it), but THIS device must not reopen it every poll — that was the
+   * modal-reopen loop. Pruned when the qid leaves /po/pending.
+   */
+  private closed = new Set<string>();
   private onVisibility = (): void => {
     if (document.visibilityState === "visible") void this.pollOnce();
   };
@@ -75,10 +82,15 @@ export class AskLoop {
           this.modals.delete(qid);
         }
       }
+      // Forget closed qids once they leave the broker — keeps the set bounded and
+      // lets a genuinely new ask (new qid) always surface.
+      for (const qid of [...this.closed]) {
+        if (!live.has(qid)) this.closed.delete(qid);
+      }
 
-      // Open a modal for each new pending ask.
+      // Open a modal for each new pending ask we haven't already closed here.
       for (const ask of pending) {
-        if (this.modals.has(ask.qid)) continue;
+        if (this.modals.has(ask.qid) || this.closed.has(ask.qid)) continue;
         this.openModal(ask);
       }
     } catch {
@@ -96,9 +108,14 @@ export class AskLoop {
     modal.open();
     void modal.result.then((r) => {
       this.modals.delete(ask.qid);
-      if (r.kind === "answered") void this.postAnswer(ask.qid, r.answers);
-      // cancel/timeout: leave it pending on the broker — another device (or a
-      // later poll here) can still answer, or the broker TTL will 408 the hook.
+      if (r.kind === "answered") {
+        void this.postAnswer(ask.qid, r.answers);
+      } else {
+        // cancel/timeout: leave it pending on the broker (another device can
+        // still answer, or the TTL will 408 the hook) but mark it closed HERE so
+        // the next poll doesn't reopen it — that was the modal-reopen loop.
+        this.closed.add(ask.qid);
+      }
     });
   }
 
