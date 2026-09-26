@@ -123,10 +123,19 @@ const server = http.createServer(async (req, res) => {
   try {
     // --- health ------------------------------------------------------------
     if (req.method === "GET" && path === "/po/health") {
+      // `present` mirrors the /po/ask presence gate: a device has polled
+      // /po/pending within PRESENCE_WINDOW_MS, so a modal fired now will be
+      // seen. The scheduled-modal launcher reads this to decide fire-vs-nudge
+      // (see pocketoracle/scheduled/evening-modal.sh) — if no device is
+      // watching it sends a text nudge instead of hanging a headless session.
+      const lastPollAgoMs = lastPollAt ? Date.now() - lastPollAt : null;
       return sendJson(res, 200, {
         ok: true,
         pending: pending.size,
         uptimeSec: Math.round((Date.now() - startedAt) / 1000),
+        lastPollAgoMs,
+        present: lastPollAt > 0 && Date.now() - lastPollAt <= PRESENCE_WINDOW_MS,
+        presenceWindowMs: PRESENCE_WINDOW_MS,
       });
     }
 
