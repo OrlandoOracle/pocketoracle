@@ -17,6 +17,10 @@ export interface PocketOracleSettings {
   /** DOM renderer is mandatory on GPU-broken boxes; webgl paints blank. Kept as a toggle only for A/B on a good GPU. */
   useCanvasRenderer: boolean;
   fontSize: number;
+  /** xterm line-height multiplier. 1.4 gives the "roomier" iPad feel Sebastian picked. */
+  lineHeight: number;
+  /** Minimal on-screen key row for the keys the iPad Magic Keyboard lacks (Esc) + quick nav. */
+  showKeyBar: boolean;
 }
 
 export const DEFAULT_SETTINGS: PocketOracleSettings = {
@@ -28,7 +32,10 @@ export const DEFAULT_SETTINGS: PocketOracleSettings = {
   sessionLabel: "main",
   authToken: "",
   useCanvasRenderer: false,
-  fontSize: 14,
+  // 18px + 1.4 line-height = the "bigger & roomier" iPad choice (8-Q look/feel pass 2026-09-26).
+  fontSize: 18,
+  lineHeight: 1.4,
+  showKeyBar: true,
 };
 
 export class PocketOracleSettingTab extends PluginSettingTab {
@@ -81,13 +88,37 @@ export class PocketOracleSettingTab extends PluginSettingTab {
       .setDesc("Terminal font size in px.")
       .addSlider((s) =>
         s
-          .setLimits(9, 22, 1)
+          .setLimits(9, 28, 1)
           .setValue(this.plugin.settings.fontSize)
           .setDynamicTooltip()
           .onChange(async (v) => {
             this.plugin.settings.fontSize = v;
             await this.plugin.saveSettings();
           }),
+      );
+
+    new Setting(containerEl)
+      .setName("Line height")
+      .setDesc("Row spacing multiplier. 1.4 = roomier; 1.0 = dense.")
+      .addSlider((s) =>
+        s
+          .setLimits(10, 20, 1) // shown as tenths; divided by 10 on apply
+          .setValue(Math.round(this.plugin.settings.lineHeight * 10))
+          .setDynamicTooltip()
+          .onChange(async (v) => {
+            this.plugin.settings.lineHeight = v / 10;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Touch key row")
+      .setDesc("Show a minimal on-screen row (Esc · Ctrl-C · Tab · arrows) — the keys the iPad Magic Keyboard lacks.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.showKeyBar).onChange(async (v) => {
+          this.plugin.settings.showKeyBar = v;
+          await this.plugin.saveSettings();
+        }),
       );
   }
 }

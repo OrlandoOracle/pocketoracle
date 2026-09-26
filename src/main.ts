@@ -44,7 +44,17 @@ export default class PocketOraclePlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const saved = (await this.loadData()) as Partial<PocketOracleSettings> | null;
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
+    // Migration: a pre-0.3 config has no `lineHeight` key. Those were saved with
+    // the old cramped fontSize:14 default — bump them to the new bigger default
+    // once so existing iPad/Mini installs pick up the roomier look on update.
+    if (saved && saved.lineHeight === undefined) {
+      this.settings.fontSize = DEFAULT_SETTINGS.fontSize;
+      this.settings.lineHeight = DEFAULT_SETTINGS.lineHeight;
+      this.settings.showKeyBar = DEFAULT_SETTINGS.showKeyBar;
+      await this.saveSettings();
+    }
   }
 
   async saveSettings(): Promise<void> {

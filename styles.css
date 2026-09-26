@@ -4,18 +4,54 @@
 .pocketoracle-view {
   padding: 0;
   height: 100%;
-  background: #1a1524;
+  background: #120e19;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .pocketoracle-term-host {
-  height: 100%;
+  flex: 1 1 auto;
   width: 100%;
-  padding: 6px 8px;
+  /* Comfortable even padding so text never hugs the pane edges (8-Q pass). */
+  padding: 12px 14px;
   box-sizing: border-box;
+  min-height: 0;
 }
 
 .pocketoracle-term-host .xterm {
   height: 100%;
+}
+
+/* Minimal touch key row — slim, docked under the terminal, Oracle-dark. */
+.pocketoracle-keybar {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+  background: #1a1524;
+  border-top: 1px solid #2a2140;
+}
+
+.pocketoracle-key {
+  flex: 1 1 0;
+  min-height: 38px;
+  padding: 6px 10px;
+  border: 1px solid #3a2f56;
+  border-radius: 8px;
+  background: #241c38;
+  color: #e8e3f2;
+  font-family: 'SFMono-Regular', Menlo, monospace;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.pocketoracle-key:active {
+  background: #3a2b5c;
+  border-color: #c8a2ff;
 }
 
 .pocketoracle-msg {

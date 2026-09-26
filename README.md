@@ -15,12 +15,21 @@ blank on some boxes). Reconnects and resizes with the pane.
 
 ## Install (BRAT)
 
-Private repo, so BRAT needs a GitHub PAT with read access:
+This is a **public** repo — no PAT needed.
 
-1. Obsidian → **BRAT** settings → paste a fine-grained PAT (read-only, this repo).
-2. BRAT → **Add beta plugin** → `Mitvaage/pocketoracle`.
-3. Enable **PocketOracle**, then set the **ttyd websocket URL** in its settings
-   (defaults to the Mac Mini's Caddy wss front).
+1. BRAT → **Add beta plugin** → `OrlandoOracle/pocketoracle`.
+2. Enable **PocketOracle**, then set the **ttyd websocket URL** in its settings
+   (per device; must be `wss://`).
+
+### Updating on the iPad
+
+BRAT only updates when the release tag's **semver goes up** — it never re-reads
+assets re-uploaded under an existing tag. So every change ships as a new patch
+tag. To pull one on the iPad:
+
+1. Command palette → **BRAT: Check for updates to a single plugin**, watch the toast.
+2. If the version didn't change → **BRAT: Choose a single plugin to reinstall**.
+3. **Force-quit** Obsidian from the app switcher and reopen (the in-place reload is unreliable on iOS).
 
 ## Host side
 

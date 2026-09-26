@@ -23,30 +23,43 @@ function ensureXtermCss(): void {
 /**
  * Oracle-dark palette. Deliberately close to the vault's AnuPpuccin-Oracle dark
  * brand so the terminal reads as part of the same surface, not a stock xterm.
+ *
+ * Tuned 2026-09-26 for HIGHER CONTRAST (8-Q iPad look/feel pass): background
+ * pushed darker, foreground brighter, so text pops from across the desk without
+ * losing the purple identity.
  */
 const ORACLE_THEME = {
-  background: "#1a1524",
-  foreground: "#e6e0f0",
+  background: "#120e19",
+  foreground: "#f4f1fb",
   cursor: "#c8a2ff",
-  cursorAccent: "#1a1524",
-  selectionBackground: "#3d2f5c",
+  cursorAccent: "#120e19",
+  selectionBackground: "#42346a",
   black: "#2a2140",
-  red: "#f06c8a",
-  green: "#8fd6a0",
-  yellow: "#e9c98a",
-  blue: "#8ab4f8",
-  magenta: "#c8a2ff",
-  cyan: "#87d7e0",
-  white: "#d8d2e6",
-  brightBlack: "#5a4f78",
-  brightRed: "#ff8aa6",
-  brightGreen: "#a8e6b8",
-  brightYellow: "#f5dca8",
-  brightBlue: "#a8c8ff",
-  brightMagenta: "#dcb8ff",
-  brightCyan: "#a0e8f0",
-  brightWhite: "#f4f0fa",
+  red: "#ff7d99",
+  green: "#9ce6ad",
+  yellow: "#f2d59a",
+  blue: "#9cc0ff",
+  magenta: "#d3b0ff",
+  cyan: "#93e2ec",
+  white: "#e8e3f2",
+  brightBlack: "#6b6090",
+  brightRed: "#ff97b1",
+  brightGreen: "#b6f0c4",
+  brightYellow: "#f9e3b2",
+  brightBlue: "#bcd4ff",
+  brightMagenta: "#e3c8ff",
+  brightCyan: "#aef0f7",
+  brightWhite: "#ffffff",
 };
+
+/** The minimal touch row: keys the iPad Magic Keyboard lacks (Esc) + fast nav/interrupt. */
+const KEY_BAR: ReadonlyArray<{ label: string; seq: string }> = [
+  { label: "Esc", seq: "\x1b" },
+  { label: "^C", seq: "\x03" },
+  { label: "Tab", seq: "\t" },
+  { label: "↑", seq: "\x1b[A" },
+  { label: "↓", seq: "\x1b[B" },
+];
 
 export class PocketOracleTerminalView extends ItemView {
   private term: Terminal | null = null;
@@ -55,6 +68,7 @@ export class PocketOracleTerminalView extends ItemView {
   private resizeObserver: ResizeObserver | null = null;
   private reconnectTimer: number | null = null;
   private resizeDebounce: number | null = null;
+  private keyBarEl: HTMLElement | null = null;
   private disposed = false;
 
   constructor(
@@ -108,8 +122,11 @@ export class PocketOracleTerminalView extends ItemView {
       fontFamily:
         "'SFMono-Regular', 'JetBrains Mono', Menlo, Monaco, 'Courier New', monospace",
       fontSize: this.settings.fontSize,
+      lineHeight: this.settings.lineHeight,
       cursorBlink: true,
-      scrollback: 100000,
+      // 10k, not 100k: xterm cells are ~12 bytes so 100k is ~100MB+ on an iPad,
+      // and tmux keeps the real history anyway (osc-modal-arch research 2026-09-26).
+      scrollback: 10000,
       // No webgl/canvas addon on purpose: the DOM renderer is the default and is
       // the one that survives GPU-broken boxes (see reference-obsidian-terminal-
       // blank-pane-renderer). Do not add an addon that flips the renderer.
@@ -124,6 +141,9 @@ export class PocketOracleTerminalView extends ItemView {
     this.term = term;
     this.fit = fit;
 
+    // Minimal touch key row (Esc etc.) — the keys the iPad Magic Keyboard lacks.
+    if (this.settings.showKeyBar) this.buildKeyBar(root);
+
     // Let the far shell drive THIS device's Obsidian appearance via OSC 5379.
     registerDisplayControl(term, this.app);
 
@@ -132,6 +152,24 @@ export class PocketOracleTerminalView extends ItemView {
     // Keep the far pty sized to the pane.
     this.resizeObserver = new ResizeObserver(() => this.refit());
     this.resizeObserver.observe(host);
+  }
+
+  /** Slim on-screen row that injects the keys a hardware iPad keyboard can't. */
+  private buildKeyBar(root: HTMLElement): void {
+    const bar = root.createDiv({ cls: "pocketoracle-keybar" });
+    for (const key of KEY_BAR) {
+      const btn = bar.createEl("button", {
+        cls: "pocketoracle-key",
+        text: key.label,
+      });
+      // pointerdown, not click: keep terminal focus, fire before the tap steals it.
+      btn.addEventListener("pointerdown", (ev) => {
+        ev.preventDefault();
+        this.client?.sendInput(key.seq);
+        this.term?.focus();
+      });
+    }
+    this.keyBarEl = bar;
   }
 
   /** Obsidian's own resize lifecycle hook — also drives the refit. */
@@ -198,6 +236,15 @@ export class PocketOracleTerminalView extends ItemView {
     this.settings = settings;
     if (this.term) {
       this.term.options.fontSize = settings.fontSize;
+      this.term.options.lineHeight = settings.lineHeight;
+      // Toggle the key bar without a full pane reopen.
+      const root = this.contentEl;
+      if (settings.showKeyBar && !this.keyBarEl) {
+        this.buildKeyBar(root);
+      } else if (!settings.showKeyBar && this.keyBarEl) {
+        this.keyBarEl.remove();
+        this.keyBarEl = null;
+      }
       this.fit?.fit();
     }
   }
@@ -217,6 +264,7 @@ export class PocketOracleTerminalView extends ItemView {
     if (this.resizeDebounce != null) window.clearTimeout(this.resizeDebounce);
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
+    this.keyBarEl = null;
     this.client?.close();
     this.client = null;
     this.term?.dispose();
