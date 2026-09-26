@@ -118,9 +118,21 @@ export class PocketOracleTerminalView extends ItemView {
 
     const host = root.createDiv({ cls: "pocketoracle-term-host" });
 
+    // Wait for the bundled font before xterm measures the cell — the DOM renderer
+    // caches cell width at open(), and measuring against a fallback (then swapping
+    // to JetBrains Mono) would misalign every column. font-display:block + this
+    // await means we open with the right metrics.
+    try {
+      await (document as unknown as { fonts: { load: (f: string) => Promise<unknown>; ready: Promise<unknown> } }).fonts.load(
+        `${this.settings.fontSize}px 'JetBrains Mono PO'`,
+      );
+    } catch {
+      /* Font API unavailable — fall through to the fallback stack. */
+    }
+
     const term = new Terminal({
       fontFamily:
-        "'SFMono-Regular', 'JetBrains Mono', Menlo, Monaco, 'Courier New', monospace",
+        "'JetBrains Mono PO', 'SFMono-Regular', Menlo, Monaco, 'Courier New', monospace",
       fontSize: this.settings.fontSize,
       lineHeight: this.settings.lineHeight,
       cursorBlink: true,

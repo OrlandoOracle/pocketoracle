@@ -7,10 +7,12 @@ VAULT="${1:-$HOME/Deborah}"
 DEST="$VAULT/.obsidian/plugins/pocketoracle"
 mkdir -p "$DEST"
 
-# xterm ships its own CSS; concatenate it after ours so a BRAT install (which
-# only copies main.js/manifest.json/styles.css) still styles the terminal even
-# if the runtime injection is ever removed.
-cat styles.css > "$DEST/styles.css"
+# The released styles.css must be self-contained (BRAT copies only main.js/
+# manifest.json/styles.css). Assemble it: bundled font @font-face (base64 woff2)
+# first, then our chrome, then xterm's own CSS.
+cat fonts.css > "$DEST/styles.css"
+echo "" >> "$DEST/styles.css"
+cat styles.css >> "$DEST/styles.css"
 if [ -f node_modules/@xterm/xterm/css/xterm.css ]; then
   echo "" >> "$DEST/styles.css"
   cat node_modules/@xterm/xterm/css/xterm.css >> "$DEST/styles.css"

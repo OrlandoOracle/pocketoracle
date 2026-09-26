@@ -1,6 +1,6 @@
 {
   "name": "obsidian-pocketoracle",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Oracle-branded Claude Code terminal inside Obsidian (xterm.js -> wss ttyd + tmux).",
   "private": true,
   "type": "module",
@@ -10,11 +10,12 @@
     "install-local": "npm run build && bash ship.sh"
   },
   "dependencies": {
-    "@xterm/xterm": "^5.5.0",
     "@xterm/addon-fit": "^0.10.0",
-    "@xterm/addon-web-links": "^0.11.0"
+    "@xterm/addon-web-links": "^0.11.0",
+    "@xterm/xterm": "^5.5.0"
   },
   "devDependencies": {
+    "@fontsource/jetbrains-mono": "^5.3.0",
     "@types/node": "^22.10.0",
     "builtin-modules": "^4.0.0",
     "esbuild": "^0.24.0",

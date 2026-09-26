@@ -27,22 +27,22 @@
 .pocketoracle-keybar {
   flex: 0 0 auto;
   display: flex;
-  gap: 6px;
-  padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+  gap: 5px;
+  padding: 4px 6px calc(4px + env(safe-area-inset-bottom, 0px));
   background: #1a1524;
   border-top: 1px solid #2a2140;
 }
 
 .pocketoracle-key {
   flex: 1 1 0;
-  min-height: 38px;
-  padding: 6px 10px;
+  min-height: 28px;
+  padding: 3px 8px;
   border: 1px solid #3a2f56;
-  border-radius: 8px;
+  border-radius: 6px;
   background: #241c38;
   color: #e8e3f2;
-  font-family: 'SFMono-Regular', Menlo, monospace;
-  font-size: 15px;
+  font-family: 'JetBrains Mono PO', 'SFMono-Regular', Menlo, monospace;
+  font-size: 13px;
   line-height: 1;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
