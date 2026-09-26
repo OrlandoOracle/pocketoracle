@@ -100,7 +100,19 @@ export class AskModal extends Modal {
 
     contentEl.createEl("div", { cls: "po-ask-brand", text: "◆ Oracle · Claude is asking" });
 
-    this.questions.forEach((q, qi) => {
+    // Instrumentation (0.4.1): a blank modal below the brand means the render
+    // aborted. Surface the shape we actually received + any thrown error inline,
+    // so a header-only card on the iPad becomes a readable diagnosis, not a guess.
+    const qs = this.questions;
+    if (!Array.isArray(qs) || qs.length === 0) {
+      contentEl.createEl("div", {
+        cls: "po-ask-error",
+        text: `no questions to render (got: ${Object.prototype.toString.call(qs)})`,
+      });
+    }
+
+    try {
+      (Array.isArray(qs) ? qs : []).forEach((q, qi) => {
       this.selection.set(qi, new Set());
       const section = contentEl.createDiv({ cls: "po-ask-q" });
       if (q.header) section.createEl("div", { cls: "po-ask-header", text: q.header });
@@ -135,7 +147,13 @@ export class AskModal extends Modal {
         // Focus inside the tap handler so iOS raises the keyboard.
         ta.focus();
       });
-    });
+      });
+    } catch (err) {
+      contentEl.createEl("div", {
+        cls: "po-ask-error",
+        text: `render error: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
 
     // Submit / Cancel row. In the single-select fast path there is no Submit —
     // the option tap itself submits.
