@@ -137,11 +137,23 @@ export class TtydClient {
 
   close(): void {
     this.opened = false;
+    const ws = this.ws;
+    this.ws = null;
+    if (!ws) return;
+    // Detach handlers BEFORE closing. ws.close() fires onclose asynchronously,
+    // a tick later — by then forceReconnect/scheduleReconnect have already made
+    // a fresh socket, so a still-attached onclose would call handlers.onClose →
+    // scheduleReconnect → tear down the NEW socket. That is the disconnect/
+    // reconnect loop. Nulling the handlers makes our own teardown silent; only a
+    // genuine remote drop reaches onClose now.
+    ws.onopen = null;
+    ws.onmessage = null;
+    ws.onclose = null;
+    ws.onerror = null;
     try {
-      this.ws?.close();
+      ws.close();
     } catch {
       /* already gone */
     }
-    this.ws = null;
   }
 }

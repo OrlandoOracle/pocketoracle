@@ -229,10 +229,14 @@ export class PocketOracleTerminalView extends ItemView {
     if (this.disposed || document.visibilityState !== "visible") return;
     const client = this.client;
     if (!client) return;
-    if (client.readyState !== WebSocket.OPEN) {
+    // Only reconnect a socket that is actually dead. CONNECTING means a
+    // reconnect is already in flight — tearing it down here just restarts the
+    // handshake every 12s (a slow-gateway loop), so give it time to open.
+    if (client.readyState === WebSocket.CLOSED || client.readyState === WebSocket.CLOSING) {
       this.forceReconnect();
       return;
     }
+    if (client.readyState !== WebSocket.OPEN) return; // CONNECTING — wait it out
     const buffered = client.bufferedAmount;
     if (buffered > 0 && this.lastBuffered > 0 && buffered >= this.lastBuffered) {
       // Bytes queued two heartbeats running and not draining → dead TCP.
