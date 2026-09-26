@@ -28,23 +28,33 @@ export class AskModal extends Modal {
   readonly qid: string;
   private questions: AskQuestion[];
   private settleFn!: (r: AskResult) => void;
-  private done = false;
-  private timer: number | null = null;
+  private done: boolean;
+  private timer: number | null;
   private ttlMs: number;
 
   /** Per-question current selection. Single: one label. Multi: a Set of labels. */
-  private selection = new Map<number, Set<string>>();
+  private selection: Map<number, Set<string>>;
   /** Per-question free-text value when the "Type…" path is used. */
-  private typed = new Map<number, string>();
-  private submitBtn: HTMLButtonElement | null = null;
+  private typed: Map<number, string>;
+  private submitBtn: HTMLButtonElement | null;
 
   readonly result: Promise<AskResult>;
 
+  // NB: every field is assigned here in the constructor body — NOT via class-field
+  // initializers. esbuild (target es2018) emitted the initializers as *native*
+  // class fields, and the iOS Obsidian WebView does not run subclass field
+  // initializers (AskModal extends Obsidian's Modal), leaving this.selection
+  // undefined → a blank modal on the iPad. Constructor assignment always runs.
   constructor(app: App, qid: string, questions: AskQuestion[], ttlMs: number) {
     super(app);
     this.qid = qid;
     this.questions = questions;
     this.ttlMs = ttlMs;
+    this.done = false;
+    this.timer = null;
+    this.selection = new Map<number, Set<string>>();
+    this.typed = new Map<number, string>();
+    this.submitBtn = null;
     this.result = new Promise<AskResult>((res) => (this.settleFn = res));
   }
 
