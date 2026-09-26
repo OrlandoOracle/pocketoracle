@@ -77,20 +77,25 @@
   --po-fg: #f4f1fb;
   --po-line: #3a2f56;
   max-width: 560px;
+  /* cosmic depth — a faint purple nebula behind the card, scoped to OUR modal */
+  background:
+    radial-gradient(120% 90% at 50% -10%, rgba(124, 92, 192, 0.22) 0%, rgba(22, 17, 31, 0) 60%),
+    var(--po-bg);
 }
 
 /* ── Signature motion (ported from LG question.css) ──────────────────────── */
 @keyframes po-glide-up {
-  from { opacity: 0; transform: translateY(16px) scale(0.97); }
-  to   { opacity: 1; transform: none; }
+  /* calmer, deeper entrance — cards surface out of a soft blur */
+  from { opacity: 0; transform: translateY(18px) scale(0.965); filter: blur(4px); }
+  to   { opacity: 1; transform: none; filter: none; }
 }
 @keyframes po-hero-in {
-  from { opacity: 0; transform: translateY(-10px); filter: blur(5px); }
+  from { opacity: 0; transform: translateY(-10px); filter: blur(6px); }
   to   { opacity: 1; transform: none; filter: none; }
 }
 @keyframes po-tap-pop {
   0%   { transform: scale(1); }
-  40%  { transform: scale(1.035); }
+  45%  { transform: scale(1.03); }
   100% { transform: scale(1); }
 }
 @keyframes po-check-pop {
@@ -99,8 +104,9 @@
   100% { opacity: 1; transform: scale(1) rotate(0deg); }
 }
 @keyframes po-beat-pulse {
-  0%   { opacity: 0.6; transform: scale(0.6); }
-  100% { opacity: 0; transform: scale(1.9); }
+  /* grander, softer cosmic ring — expands wider and fades gently */
+  0%   { opacity: 0.7; transform: scale(0.55); }
+  100% { opacity: 0; transform: scale(2.2); }
 }
 
 .po-ask-content {
@@ -113,7 +119,7 @@
   letter-spacing: 0.06em;
   opacity: 0.9;
   margin-bottom: 14px;
-  animation: po-hero-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: po-hero-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .po-ask-error {
@@ -130,7 +136,7 @@
 
 .po-ask-q {
   margin-bottom: 18px;
-  animation: po-hero-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: po-hero-in 0.52s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .po-ask-header {
@@ -180,10 +186,12 @@
   overflow: hidden;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
-  transition: border-color 0.12s, transform 0.06s;
+  /* soft purple cosmic glow at rest — depth without loudness */
+  box-shadow: 0 8px 26px -14px rgba(124, 92, 192, 0.45);
+  transition: border-color 0.2s ease, transform 0.12s ease, box-shadow 0.28s ease;
   /* staggered glide-in — --i is set per option in ask-modal.ts */
-  animation: po-glide-up 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: calc(var(--i, 0) * 0.045s + 0.05s);
+  animation: po-glide-up 0.46s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--i, 0) * 0.06s + 0.07s);
 }
 
 .po-ask-option:active {
@@ -255,10 +263,12 @@
 
 /* tap-confirm flourish — gold pop + flash on the chosen card */
 .po-ask-option.confirming {
-  animation: po-tap-pop 0.22s ease-out;
+  animation: po-tap-pop 0.28s ease-out;
   border-color: var(--po-gold);
   background: linear-gradient(160deg, #35304a 0%, #241f33 100%);
-  box-shadow: 0 0 0 2px rgba(232, 199, 106, 0.5) inset;
+  /* gold inset flash + a warm outer bloom for the satisfying tap */
+  box-shadow: 0 0 0 2px rgba(232, 199, 106, 0.5) inset,
+              0 0 22px -2px rgba(232, 199, 106, 0.45);
 }
 
 /* full-screen "beat" — a gold ring pulse from center on submit (spawned on body) */
@@ -271,9 +281,11 @@
   margin: -85px 0 0 -85px;
   border-radius: 50%;
   border: 3px solid var(--po-gold);
+  /* soft gold halo so the ring reads as a cosmic pulse, not a hard circle */
+  box-shadow: 0 0 30px 4px rgba(232, 199, 106, 0.35);
   pointer-events: none;
   z-index: 2500;
-  animation: po-beat-pulse 0.42s ease-out forwards;
+  animation: po-beat-pulse 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {

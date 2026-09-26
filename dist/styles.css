@@ -83,15 +83,51 @@
 }
 
 /* ── Ask-loop modal: the native tap-to-answer surface ──────────────────────
-   Claude asks → this pops with big buttons. Oracle-dark identity, tuned for a
-   visually-impaired reader: large type, high contrast, ≥64px tap targets. On a
-   phone it goes full-screen. */
+   Claude asks → this pops with big buttons. PocketOracle-purple identity with a
+   GOLD "satisfying-tap" accent, and the option-card look + signature motion
+   ported from the Looking Glass question wizard (looking-glass/src/question.css).
+   Design ruled in the 12-Q /ask 2026-09-26: centered card on iPad/desktop (terminal
+   dims behind), full LG motion, gold reserved ONLY for the tap flourish / ✓ / beat.
+   Tuned for a visually-impaired reader: large type, high contrast, ≥64px targets. */
 .modal.po-ask {
   --po-purple: #c8a2ff;
+  --po-purple-deep: #7c5cc0;
+  --po-gold: #e8c76a; /* the tap-satisfaction accent — flash / ✓ / beat ring only */
+  --po-gold-deep: #d4a843;
   --po-bg: #16111f;
   --po-fg: #f4f1fb;
   --po-line: #3a2f56;
   max-width: 560px;
+  /* cosmic depth — a faint purple nebula behind the card, scoped to OUR modal */
+  background:
+    radial-gradient(120% 90% at 50% -10%, rgba(124, 92, 192, 0.22) 0%, rgba(22, 17, 31, 0) 60%),
+    var(--po-bg);
+}
+
+/* ── Signature motion (ported from LG question.css) ──────────────────────── */
+@keyframes po-glide-up {
+  /* calmer, deeper entrance — cards surface out of a soft blur */
+  from { opacity: 0; transform: translateY(18px) scale(0.965); filter: blur(4px); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+@keyframes po-hero-in {
+  from { opacity: 0; transform: translateY(-10px); filter: blur(6px); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+@keyframes po-tap-pop {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+@keyframes po-check-pop {
+  0%   { opacity: 0; transform: scale(0.4) rotate(-10deg); }
+  60%  { opacity: 1; transform: scale(1.15) rotate(0deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+@keyframes po-beat-pulse {
+  /* grander, softer cosmic ring — expands wider and fades gently */
+  0%   { opacity: 0.7; transform: scale(0.55); }
+  100% { opacity: 0; transform: scale(2.2); }
 }
 
 .po-ask-content {
@@ -100,107 +136,237 @@
 
 .po-ask-brand {
   color: var(--po-purple);
-  font-size: 0.8em;
-  letter-spacing: 0.04em;
-  opacity: 0.85;
+  font-size: 0.82em;
+  letter-spacing: 0.06em;
+  opacity: 0.9;
+  margin-bottom: 14px;
+  animation: po-hero-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.po-ask-error {
+  color: #ff8a8a;
+  font-size: 0.95em;
+  line-height: 1.4;
+  padding: 8px 10px;
   margin-bottom: 12px;
+  border: 1px solid #6b2b2b;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .po-ask-q {
   margin-bottom: 18px;
+  animation: po-hero-in 0.52s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .po-ask-header {
   display: inline-block;
   font-size: 0.72em;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.14em;
+  font-weight: 700;
   color: var(--po-purple);
-  border: 1px solid var(--po-line);
-  border-radius: 5px;
-  padding: 2px 8px;
   margin-bottom: 8px;
 }
 
 .po-ask-question {
-  font-size: 1.15em;
-  font-weight: 600;
-  line-height: 1.35;
-  margin-bottom: 12px;
+  font-size: 1.32em;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  margin-bottom: 14px;
 }
 
 .po-ask-options {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
+/* an option sub-card (LG .q-opt) */
 .po-ask-option {
-  display: block;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start; /* left-align children; Obsidian's button reset centers */
+  gap: 6px;
   width: 100%;
   min-height: 64px;
   text-align: left;
-  padding: 12px 16px;
-  border: 1.5px solid var(--po-line);
-  border-radius: 12px;
-  background: var(--background-secondary);
-  color: var(--text-normal);
+  /* Obsidian's core button style sets white-space:nowrap, which inherits into
+     the label/desc divs and makes them one clipped line. Force normal wrap. */
+  white-space: normal;
+  padding: 18px 20px;
+  border: 2px solid var(--po-line);
+  border-radius: 16px;
+  background: linear-gradient(160deg, #221c33 0%, #17121f 100%);
+  color: var(--po-fg);
   cursor: pointer;
+  overflow: hidden;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
-  transition: border-color 0.08s, background 0.08s;
+  /* soft purple cosmic glow at rest — depth without loudness */
+  box-shadow: 0 8px 26px -14px rgba(124, 92, 192, 0.45);
+  transition: border-color 0.2s ease, transform 0.12s ease, box-shadow 0.28s ease;
+  /* staggered glide-in — --i is set per option in ask-modal.ts */
+  animation: po-glide-up 0.46s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--i, 0) * 0.06s + 0.07s);
 }
 
 .po-ask-option:active {
-  background: var(--background-modifier-hover);
+  transform: scale(0.985);
 }
 
-.po-ask-option.is-selected {
-  border-color: var(--po-purple);
-  background: rgba(200, 162, 255, 0.12);
+/* resting number badge — purple/dim (gold is reserved for the tap flourish) */
+.po-ask-num {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #14101c;
+  border: 1px solid var(--po-line);
+  color: var(--po-purple);
+  font-size: 0.82em;
+  font-weight: 700;
 }
 
 .po-ask-option-label {
-  font-size: 1.05em;
-  font-weight: 600;
-  line-height: 1.25;
+  width: 100%;
+  text-align: left;
+  white-space: normal;
+  font-size: 1.15em;
+  font-weight: 700;
+  line-height: 1.2;
+  padding-right: 44px; /* clear the number badge */
 }
 
 .po-ask-option-desc {
-  font-size: 0.85em;
-  opacity: 0.7;
-  margin-top: 3px;
+  width: 100%;
+  text-align: left;
+  white-space: normal;
+  font-size: 0.9em;
+  opacity: 0.72;
   line-height: 1.3;
 }
 
+.po-ask-option-desc:empty {
+  display: none;
+}
+
+/* chosen (persistent, multi-select) — gold border + ✓ check */
+.po-ask-option.is-selected {
+  border-color: var(--po-gold-deep);
+  background: linear-gradient(160deg, #2c2740 0%, #201b2d 100%);
+}
+
+.po-ask-check {
+  display: none;
+}
+
+.po-ask-option.is-selected .po-ask-check,
+.po-ask-option.confirming .po-ask-check {
+  display: flex;
+  position: absolute;
+  bottom: 12px;
+  right: 14px;
+  color: var(--po-gold);
+  font-size: 1.4em;
+  font-weight: 800;
+  animation: po-check-pop 0.26s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* tap-confirm flourish — gold pop + flash on the chosen card */
+.po-ask-option.confirming {
+  animation: po-tap-pop 0.28s ease-out;
+  border-color: var(--po-gold);
+  background: linear-gradient(160deg, #35304a 0%, #241f33 100%);
+  /* gold inset flash + a warm outer bloom for the satisfying tap */
+  box-shadow: 0 0 0 2px rgba(232, 199, 106, 0.5) inset,
+              0 0 22px -2px rgba(232, 199, 106, 0.45);
+}
+
+/* full-screen "beat" — a gold ring pulse from center on submit (spawned on body) */
+.po-ask-beat {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 170px;
+  height: 170px;
+  margin: -85px 0 0 -85px;
+  border-radius: 50%;
+  border: 3px solid var(--po-gold);
+  /* soft gold halo so the ring reads as a cosmic pulse, not a hard circle */
+  box-shadow: 0 0 30px 4px rgba(232, 199, 106, 0.35);
+  pointer-events: none;
+  z-index: 2500;
+  animation: po-beat-pulse 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .po-ask-brand,
+  .po-ask-q,
+  .po-ask-option,
+  .po-ask-option.confirming,
+  .po-ask-option.confirming .po-ask-check {
+    animation: none;
+  }
+  .po-ask-beat {
+    display: none;
+  }
+}
+
+/* "type or dictate your own" — dashed escape hatch under the option cards (LG) */
 .po-ask-typerow {
-  margin-top: 8px;
+  margin-top: 12px;
 }
 
 .po-ask-type {
+  width: 100%;
+  min-height: 52px;
+  border: 1px dashed var(--po-line);
+  border-radius: 12px;
   background: transparent;
-  border: none;
   color: var(--po-purple);
-  font-size: 0.9em;
-  padding: 6px 2px;
+  font-size: 0.95em;
+  font-weight: 600;
   cursor: pointer;
-  opacity: 0.8;
+  opacity: 0.9;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.po-ask-type:active {
+  background: rgba(200, 162, 255, 0.08);
 }
 
 .po-ask-textarea {
   width: 100%;
   min-height: 72px;
-  margin-top: 8px;
-  padding: 10px 12px;
-  border-radius: 10px;
+  margin-top: 10px;
+  padding: 14px 16px;
+  border: 2px solid var(--po-line);
+  border-radius: 12px;
+  background: #17121f;
+  color: var(--po-fg);
   font-size: 1em;
   resize: vertical;
+}
+
+.po-ask-textarea:focus {
+  outline: none;
+  border-color: var(--po-purple);
 }
 
 .po-ask-actions {
   display: flex;
   gap: 10px;
-  margin-top: 8px;
+  margin-top: 12px;
 }
 
 .po-ask-submit {
@@ -208,7 +374,7 @@
   min-height: 56px;
   border-radius: 12px;
   font-size: 1.05em;
-  font-weight: 600;
+  font-weight: 700;
   background: var(--po-purple);
   color: #1a1226;
   border: none;
@@ -218,6 +384,13 @@
 .po-ask-submit:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* Send button revealed under the textarea in the single-select fast path
+   (that path has no global Submit, so a typed answer needs its own send). */
+.po-ask-send {
+  width: 100%;
+  margin-top: 10px;
 }
 
 .po-ask-cancel {
@@ -231,7 +404,8 @@
 }
 
 /* Full-screen on phones so the buttons own the view and the keyboard (when the
-   Type… path is used) doesn't cover them. */
+   Type… path is used) doesn't cover them. iPad stays a centered card (the /ask
+   ruling) — Obsidian only sets .is-phone on actual phones, not tablets. */
 .is-phone .modal.po-ask {
   width: 100vw;
   height: 100dvh;
