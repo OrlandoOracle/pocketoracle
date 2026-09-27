@@ -39,6 +39,8 @@
  */
 import http from "node:http";
 import { randomBytes } from "node:crypto";
+import { execFile } from "node:child_process";
+import { homedir } from "node:os";
 
 const HOST = "127.0.0.1";
 const PORT = 7893;
@@ -243,6 +245,37 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 200, { ok: true, qid });
       }
       return sendJson(res, 410, { error: "gone" });
+    }
+
+    // --- run (a Life-canvas node tap fires a headless task) ----------------
+    // POST {slug} → exec po-run.sh <slug>. The script is the security boundary:
+    // it allowlists the slug by charset AND by an authored orders file, so this
+    // endpoint cannot launch anything we did not write. Reached only via Caddy's
+    // cert+ACL'd /po/* proxy (the tailnet never touches :7893 directly).
+    if (req.method === "POST" && path === "/po/run") {
+      const raw = await readBody(req);
+      let body;
+      try {
+        body = JSON.parse(raw || "{}");
+      } catch {
+        return sendJson(res, 400, { error: "invalid json" });
+      }
+      const slug = typeof body.slug === "string" ? body.slug : "";
+      // Defense in depth — the script re-validates, but reject obvious junk here
+      // so we never even spawn a process for a hostile slug.
+      if (!/^[a-z0-9][a-z0-9-]{0,40}$/.test(slug)) {
+        return sendJson(res, 400, { error: "bad slug" });
+      }
+      const script = `${homedir()}/Code/pocketoracle/scheduled/po-run.sh`;
+      execFile("/bin/bash", [script, slug], { timeout: 30_000 }, (err, stdout) => {
+        const result = (stdout || "").trim() || (err ? "error" : "");
+        log("run", slug, "→", result || (err ? err.message : "?"));
+        if (res.headersSent) return;
+        // po-run.sh prints one word: launched|already-running|no-device|no-orders|bad-slug.
+        const ok = result === "launched" || result === "already-running";
+        sendJson(res, ok ? 200 : 409, { ok, slug, result: result || "error" });
+      });
+      return; // response sent from the execFile callback
     }
 
     return sendJson(res, 404, { error: "not found" });
