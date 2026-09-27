@@ -10,6 +10,7 @@ import { AskLoop, deriveBrokerBase } from "./ask/ask-loop";
 import { registerRunLinks, registerRunProtocol, runActiveCanvasNode } from "./run-task";
 import {
   openActiveCanvasNodeTerminal,
+  registerCanvasNodeTap,
   registerFullScreenSync,
   registerOpenLinks,
   registerOpenProtocol,
@@ -60,6 +61,7 @@ export default class PocketOraclePlugin extends Plugin {
     // Same reliable-click-path pattern as po-run above.
     registerOpenProtocol(this);
     registerOpenLinks(this);
+    registerCanvasNodeTap(this); // Slice-2: whole-card tap-to-launch
     registerFullScreenSync(this);
     this.addCommand({
       id: "open-canvas-node-terminal",

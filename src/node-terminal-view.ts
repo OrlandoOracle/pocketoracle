@@ -141,6 +141,24 @@ export class PoTermView extends ItemView {
     this.originLeaf = leaf;
   }
 
+  /** Return to the canvas we came from — or, if that leaf is gone (e.g. after a
+   *  reload dropped the non-persisted originLeaf), fall back to the workspace's
+   *  most-recent non-terminal leaf so mobile always lands somewhere navigable. */
+  private goBack(): void {
+    const ws = this.app.workspace;
+    if (this.originLeaf) {
+      void ws.revealLeaf(this.originLeaf);
+      return;
+    }
+    const recent = ws.getMostRecentLeaf?.();
+    if (recent && recent !== this.leaf) {
+      ws.setActiveLeaf(recent, { focus: true });
+      void ws.revealLeaf(recent);
+      return;
+    }
+    new Notice("PocketOracle: no canvas to return to — use the tab switcher.");
+  }
+
   override async onOpen(): Promise<void> {
     ensureXtermCss();
     const root = this.contentEl;
@@ -148,9 +166,21 @@ export class PoTermView extends ItemView {
     root.addClass("pocketoracle-view");
     root.addClass("po-term-view");
 
-    this.addAction("arrow-left", "Back to canvas", () => {
-      if (this.originLeaf) void this.app.workspace.revealLeaf(this.originLeaf);
-      else new Notice("PocketOracle: no canvas to return to — use the tab switcher.");
+    this.addAction("arrow-left", "Back to canvas", () => this.goBack());
+
+    // A floating in-pane escape. The header action above lives in the tab
+    // header, which the mobile full-screen rule hides — so on mobile that
+    // button vanishes and the only exit is the ribbon. This one is inside the
+    // view content, styled visible only when the header is hidden, so there is
+    // always a way out. (Desktop keeps its tab bar, so it stays hidden there.)
+    const back = root.createEl("button", {
+      cls: "po-term-escape",
+      text: "‹ Back",
+      attr: { "aria-label": "Back to canvas" },
+    });
+    back.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      this.goBack();
     });
 
     if (!this.settings.wsUrl.trim()) {
@@ -221,6 +251,12 @@ export class PoTermView extends ItemView {
 
     this.connect(nodeUrl);
 
+    // Grab keyboard focus on open — without this the xterm mounts unfocused,
+    // so the first keystrokes go nowhere and the pane reads as "can't type"
+    // (the terminal shows output but never accepts input). A tap into the
+    // canvas node opens this leaf but leaves focus on the canvas otherwise.
+    term.focus();
+
     this.resizeObserver = new ResizeObserver(() => this.refit());
     this.resizeObserver.observe(this.hostEl);
 
@@ -237,6 +273,7 @@ export class PoTermView extends ItemView {
         this.backoffMs = RECONNECT_FLOOR_MS;
         this.lastBuffered = 0;
         this.refit();
+        this.term?.focus();
       },
       onClose: (ev) => {
         if (this.disposed) return;

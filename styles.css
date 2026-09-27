@@ -441,13 +441,46 @@ a.po-open-button:active {
   border-color: var(--po-gold, #e8c76a);
 }
 
-/* Node-terminal full-screen (iPad) — hide the tab header chrome while a
-   po-term view is the active leaf. Toggled by open-term.ts's
-   registerFullScreenSync on active-leaf-change; NOT applied via
-   openPopoutLeaf/moveLeafToPopout, which throw on mobile. `.workspace-tab-
-   header-container` is an Obsidian internal class (undocumented but stable
-   across recent releases) — if a future Obsidian update renames it, the
-   worst case is the tab header stays visible, not a broken terminal. */
-body.po-term-fullscreen .workspace-tab-header-container {
+/* Node-terminal full-screen — hide the tab header chrome while a po-term view
+   is the active leaf. Toggled by open-term.ts's registerFullScreenSync on
+   active-leaf-change; NOT applied via openPopoutLeaf/moveLeafToPopout, which
+   throw on mobile. `.workspace-tab-header-container` is an Obsidian internal
+   class (undocumented but stable across recent releases) — if a future
+   Obsidian update renames it, the worst case is the tab header stays visible,
+   not a broken terminal.
+
+   SCOPED TO MOBILE (`body.is-mobile`) on purpose: on desktop, hiding the tab
+   header also hides the view-action buttons that live in it — including the
+   "Back to canvas" arrow — leaving the ribbon as the only exit, and needlessly
+   removing the tab bar. Desktop keeps its tabs; mobile relies on the floating
+   `.po-term-escape` button below for its way out. */
+body.is-mobile.po-term-fullscreen .workspace-tab-header-container {
   display: none !important;
+}
+
+/* Floating in-pane escape — hidden by default (desktop has its tab header +
+   the header's Back action), shown only when the mobile full-screen rule has
+   hidden that header. Fixed top-left so it never scrolls away with the term. */
+.po-term-view {
+  position: relative; /* anchor for the absolute .po-term-escape button */
+}
+
+.po-term-escape {
+  display: none;
+}
+body.is-mobile.po-term-fullscreen .po-term-view .po-term-escape {
+  display: inline-flex;
+  align-items: center;
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  left: 10px;
+  z-index: 20;
+  padding: 6px 12px;
+  font-size: 13px;
+  border-radius: 8px;
+  color: var(--po-gold, #e8c76a);
+  background: rgba(18, 14, 25, 0.82);
+  border: 1px solid var(--po-gold-deep, #d4a843);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
 }

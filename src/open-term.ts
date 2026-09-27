@@ -170,6 +170,97 @@ export function registerOpenLinks(plugin: Plugin): void {
   plugin.registerEvent(plugin.app.workspace.on("file-open", rescan));
 }
 
+/**
+ * Slice-2 — whole-card tap-to-launch. Makes the ENTIRE canvas node a launch
+ * target (springboard feel), not just a link rendered inside it.
+ *
+ * Robust by construction, per the research §(d)/footgun-14 ruling: this touches
+ * NO canvas runtime internals (`canvas.nodes`, monkey-patched onDoubleClick) —
+ * those break on Obsidian updates and turn double-click into double-tap on
+ * touch. It is a single capturing `document` click listener that reasons purely
+ * over the rendered DOM:
+ *
+ *   - A clean click (press+release, no drag) is the "open" intent. Dragging a
+ *     card to move it fires pointer/drag events, NOT click — so tap-to-open and
+ *     drag-to-move never collide, and there's no double-tap gesture to fight the
+ *     canvas's own double-click-to-edit.
+ *   - The slug comes from the tapped `.canvas-node`'s rendered text via the same
+ *     `extractSlug` the link path uses, so a bare `po-open:<slug>` line, an
+ *     inline-code token, or a full markdown link all work identically.
+ *   - Cards with no `po-open:` token are left completely alone (returns null),
+ *     so mixed canvases (Life.canvas) keep normal select/drag behaviour.
+ *
+ * Guards: never fires while the node is being text-edited (an open editor would
+ * mean the user is typing, not launching), and yields to the per-link
+ * `.po-open-button` handler so a click that lands on an actual upgraded link
+ * isn't double-dispatched.
+ */
+export function registerCanvasNodeTap(plugin: Plugin): void {
+  plugin.registerDomEvent(
+    document,
+    "click",
+    (ev: MouseEvent) => {
+      const target = ev.target as HTMLElement | null;
+      if (!target) return;
+
+      // Yield to any interactive element inside the card — a po-open button, a
+      // po-run task link, or any other anchor/button. Those own their own click
+      // (e.g. nMeals' `[▶ Run grocery]` po-run link), so a tap on them must NOT
+      // also whole-card-launch a terminal. Only a tap on the card BODY launches.
+      if (target.closest("a, button, .po-open-button, .po-run-button")) return;
+
+      const card = target.closest<HTMLElement>(".canvas-node");
+      if (!card) return;
+
+      // Don't launch while the card is in text-edit mode — the user is typing,
+      // not opening. Obsidian marks the editing node and mounts an editor.
+      if (
+        card.classList.contains("is-editing") ||
+        card.querySelector(".is-editing, textarea, [contenteditable='true']")
+      ) {
+        return;
+      }
+
+      // A drag-select of text inside the card shouldn't launch either.
+      const selection = window.getSelection();
+      if (selection && !selection.isCollapsed && card.contains(selection.anchorNode)) {
+        return;
+      }
+
+      const slug = slugFromCard(card);
+      if (!slug) return; // not a launch tile — leave native select/drag intact
+
+      ev.preventDefault();
+      ev.stopPropagation();
+      void openTerminalForSlug(plugin, slug);
+    },
+    { capture: true },
+  );
+}
+
+/** Pull a po-open slug out of a rendered canvas card: prefer an explicit link's
+ *  href (protocol or legacy), then any `po-open:` code token, then the card's
+ *  whole text (a bare `po-open:<slug>` / bare-slug line). Case-preserving. */
+function slugFromCard(card: HTMLElement): string | null {
+  const link = card.querySelector<HTMLAnchorElement>(
+    `a[href^="${PROTO_PREFIX}"], a[href^="${LEGACY_LINK_PREFIX}"]`,
+  );
+  if (link) {
+    const s = extractSlug(link.getAttribute("href") || "");
+    if (s) return s;
+  }
+  for (const code of Array.from(card.querySelectorAll<HTMLElement>("code"))) {
+    const s = extractSlug((code.textContent || "").trim());
+    if (s) return s;
+  }
+  // Whole-card text fallback, but ONLY when an explicit `po-open:` marker is
+  // present — never the bare-slug branch of extractSlug, which would turn any
+  // single-word title card into an accidental launch tile.
+  const text = (card.textContent || "").trim();
+  if (text.includes(LEGACY_LINK_PREFIX)) return extractSlug(text);
+  return null;
+}
+
 /** Fallback command: open the terminal for the currently-selected Canvas node,
  *  mirroring `runActiveCanvasNode` in run-task.ts. */
 export function openActiveCanvasNodeTerminal(plugin: Plugin): void {
