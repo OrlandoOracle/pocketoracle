@@ -260,6 +260,16 @@ export class PoTermView extends ItemView {
     this.resizeObserver = new ResizeObserver(() => this.refit());
     this.resizeObserver.observe(this.hostEl);
 
+    // iOS soft-keyboard fit — see terminal-view.ts for the full rationale. The
+    // layout viewport doesn't shrink when the keyboard opens, so the
+    // ResizeObserver misses it; visualViewport catches the open/close/animation
+    // and refits the terminal to the space actually above the keyboard.
+    const vv = window.visualViewport;
+    if (vv) {
+      this.registerDomEvent(vv as unknown as HTMLElement, "resize", () => this.refit());
+      this.registerDomEvent(vv as unknown as HTMLElement, "scroll", () => this.refit());
+    }
+
     this.heartbeatTimer = window.setInterval(() => this.heartbeat(), HEARTBEAT_MS);
   }
 
@@ -384,6 +394,7 @@ export class PoTermView extends ItemView {
       this.resizeDebounce = null;
       try {
         this.fit?.fit();
+        this.term?.scrollToBottom();
       } catch {
         /* pane not laid out yet */
       }

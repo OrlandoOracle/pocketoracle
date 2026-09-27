@@ -1,7 +1,7 @@
 {
   "id": "pocketoracle",
   "name": "PocketOracle",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "minAppVersion": "1.13.7",
   "description": "Oracle-branded Claude Code terminal inside Obsidian \u2014 an xterm.js pane over wss to a host-side ttyd + tmux, attaching the same live session Moshi uses. iPad/iPhone/Mac.",
   "author": "Sebastian Gerhardt",

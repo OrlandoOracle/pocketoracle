@@ -191,6 +191,18 @@ export class PocketOracleTerminalView extends ItemView {
     this.resizeObserver = new ResizeObserver(() => this.refit());
     this.resizeObserver.observe(host);
 
+    // iOS soft-keyboard fit. When the on-screen keyboard opens, the layout
+    // viewport does NOT shrink on iOS — so the ResizeObserver above can miss it
+    // and the terminal stays fit to a stale (transient) height, collapsing to a
+    // few rows with dead space between the key bar and the keyboard. The
+    // visualViewport fires on keyboard open/close and through the animation;
+    // refit off it so the terminal fills the space actually above the keyboard.
+    const vv = window.visualViewport;
+    if (vv) {
+      this.registerDomEvent(vv as unknown as HTMLElement, "resize", () => this.refit());
+      this.registerDomEvent(vv as unknown as HTMLElement, "scroll", () => this.refit());
+    }
+
     // ── Reliability floor ────────────────────────────────────────────────────
     // The #1 trust-killer is "blank when I come back": iOS freezes/kills the WS
     // while Obsidian is backgrounded, and on return a zombie socket can leave the
@@ -354,6 +366,9 @@ export class PocketOracleTerminalView extends ItemView {
       this.resizeDebounce = null;
       try {
         this.fit?.fit();
+        // Keep the prompt in view after a keyboard-driven refit — otherwise the
+        // cursor can end up scrolled off above the visible rows.
+        this.term?.scrollToBottom();
       } catch {
         /* pane not laid out yet */
       }
