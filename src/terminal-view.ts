@@ -9,9 +9,11 @@ import type { PocketOracleSettings } from "./settings";
 
 export const VIEW_TYPE_POCKETORACLE = "pocketoracle-terminal";
 
-// Injected once (not per-view) so multiple panes share one <style>.
+// Injected once (not per-view) so multiple panes — including po-term node
+// terminals, which import this from here rather than re-bundling the CSS —
+// share one <style>.
 let xtermCssInjected = false;
-function ensureXtermCss(): void {
+export function ensureXtermCss(): void {
   if (xtermCssInjected) return;
   const style = document.createElement("style");
   style.id = "pocketoracle-xterm-css";

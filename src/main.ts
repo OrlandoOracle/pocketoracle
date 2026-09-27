@@ -5,8 +5,15 @@ import {
   type PocketOracleSettings,
 } from "./settings";
 import { PocketOracleTerminalView, VIEW_TYPE_POCKETORACLE } from "./terminal-view";
+import { PoTermView, VIEW_TYPE_PO_TERM } from "./node-terminal-view";
 import { AskLoop, deriveBrokerBase } from "./ask/ask-loop";
 import { registerRunLinks, registerRunProtocol, runActiveCanvasNode } from "./run-task";
+import {
+  openActiveCanvasNodeTerminal,
+  registerFullScreenSync,
+  registerOpenLinks,
+  registerOpenProtocol,
+} from "./open-term";
 
 // Just under the broker's 290 s /po/ask hold, so the modal never outlives the
 // ask it represents.
@@ -23,6 +30,7 @@ export default class PocketOraclePlugin extends Plugin {
       VIEW_TYPE_POCKETORACLE,
       (leaf) => new PocketOracleTerminalView(leaf, this.settings),
     );
+    this.registerView(VIEW_TYPE_PO_TERM, (leaf) => new PoTermView(leaf, this.settings));
 
     this.addRibbonIcon("square-terminal", "Open Oracle terminal", () => {
       void this.openTerminal();
@@ -45,6 +53,18 @@ export default class PocketOraclePlugin extends Plugin {
       id: "run-canvas-node-task",
       name: "Run canvas node task",
       callback: () => runActiveCanvasNode(this, () => this.brokerBase()),
+    });
+
+    // Life-canvas node taps that open a LIVE per-project terminal instead of a
+    // headless task: `[▶ Open LookingGlass](obsidian://po-open?slug=LookingGlass)`.
+    // Same reliable-click-path pattern as po-run above.
+    registerOpenProtocol(this);
+    registerOpenLinks(this);
+    registerFullScreenSync(this);
+    this.addCommand({
+      id: "open-canvas-node-terminal",
+      name: "Open canvas node terminal",
+      callback: () => openActiveCanvasNodeTerminal(this),
     });
 
     // The ask-loop runs at plugin level (not per-pane) so Claude's questions pop
@@ -108,6 +128,10 @@ export default class PocketOraclePlugin extends Plugin {
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_POCKETORACLE)) {
       const view = leaf.view;
       if (view instanceof PocketOracleTerminalView) view.settingsChanged(this.settings);
+    }
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_PO_TERM)) {
+      const view = leaf.view;
+      if (view instanceof PoTermView) view.settingsChanged(this.settings);
     }
     // Ask-loop config (enable/broker/poll) can change here — reflect it live.
     this.startAskLoop();
