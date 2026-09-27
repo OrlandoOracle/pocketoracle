@@ -6,6 +6,7 @@ import {
 } from "./settings";
 import { PocketOracleTerminalView, VIEW_TYPE_POCKETORACLE } from "./terminal-view";
 import { AskLoop, deriveBrokerBase } from "./ask/ask-loop";
+import { registerRunLinks, runActiveCanvasNode } from "./run-task";
 
 // Just under the broker's 290 s /po/ask hold, so the modal never outlives the
 // ask it represents.
@@ -35,9 +36,23 @@ export default class PocketOraclePlugin extends Plugin {
 
     this.addSettingTab(new PocketOracleSettingTab(this.app, this));
 
+    // Life-canvas node taps: `[▶ Run grocery](po-run:grocery)` links become
+    // buttons that POST /po/run {slug}. Primary path (works in Canvas cards).
+    registerRunLinks(this, () => this.brokerBase());
+    this.addCommand({
+      id: "run-canvas-node-task",
+      name: "Run canvas node task",
+      callback: () => runActiveCanvasNode(this, () => this.brokerBase()),
+    });
+
     // The ask-loop runs at plugin level (not per-pane) so Claude's questions pop
     // as native tap buttons even when the terminal tab isn't focused.
     this.startAskLoop();
+  }
+
+  /** Broker base URL — explicit setting, else derived from the ttyd wss URL. */
+  brokerBase(): string {
+    return this.settings.brokerUrl.trim() || deriveBrokerBase(this.settings.wsUrl);
   }
 
   override onunload(): void {

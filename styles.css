@@ -391,3 +391,27 @@
   max-width: 100vw;
   border-radius: 0;
 }
+
+/* Life-canvas node-tap buttons — `[▶ Run grocery](po-run:grocery)` links get
+   this treatment via the run-task post-processor. Additive + scoped: only
+   anchors we rewrote carry .po-run-button, so nothing else in Obsidian shifts. */
+a.po-run-button {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 10px;
+  background: var(--po-purple-deep, #7c5cc0);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  border: 1px solid var(--po-purple, #c8a2ff);
+  transition: transform 0.08s ease, box-shadow 0.15s ease;
+}
+a.po-run-button:hover {
+  box-shadow: 0 0 12px rgba(200, 162, 255, 0.5);
+}
+a.po-run-button:active {
+  transform: scale(0.96);
+  background: var(--po-gold-deep, #d4a843);
+  border-color: var(--po-gold, #e8c76a);
+}

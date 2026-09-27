@@ -90,6 +90,13 @@ sed -e "s|{{DAILY_NOTE}}|$DAILY_NOTE|g" \
 TOOLS_FILE="$REPO/${SLUG}.tools"
 if [ -f "$TOOLS_FILE" ]; then
   ALLOWED="$(head -1 "$TOOLS_FILE")"
+  # An empty/whitespace-only .tools file is a DELIBERATE zero-Bash lockdown, not a
+  # "grant nothing" mistake. Passing --allowedTools '' would strip even AskUserQuestion
+  # and strand the session. Treat it as the no-Bash safe set so an on-demand task can
+  # never improvise a shell command yet can still ask + write inside the vault.
+  if [ -z "$(printf '%s' "$ALLOWED" | tr -d '[:space:]')" ]; then
+    ALLOWED='AskUserQuestion,Read,Edit,Write,Glob,Grep'
+  fi
 else
   ALLOWED='AskUserQuestion,Read,Edit,Write,Glob,Grep,Bash(touch *)'
 fi
