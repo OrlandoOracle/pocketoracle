@@ -392,6 +392,7 @@ export class PoTermView extends ItemView {
     if (this.resizeDebounce != null) window.clearTimeout(this.resizeDebounce);
     this.resizeDebounce = window.setTimeout(() => {
       this.resizeDebounce = null;
+      this.clampToVisualViewport();
       try {
         this.fit?.fit();
         this.term?.scrollToBottom();
@@ -399,6 +400,24 @@ export class PoTermView extends ItemView {
         /* pane not laid out yet */
       }
     }, 80);
+  }
+
+  /**
+   * iOS keeps the LAYOUT viewport full-height when the soft keyboard opens, so
+   * our full-screen view stays tall and fit() sizes the terminal past the
+   * keyboard — the prompt row renders behind it and scrollToBottom() can't help
+   * (the row is physically under the keyboard, not just scrolled off). Clamp the
+   * view root to visualViewport.height (the band above the keyboard) so the flex
+   * column collapses the terminal into the visible region before we fit. On
+   * keyboard-close vv.height returns to full-screen and this resets to full.
+   * Desktop keeps the CSS height:100% path untouched.
+   */
+  private clampToVisualViewport(): void {
+    if (!Platform.isMobile) return;
+    const vv = window.visualViewport;
+    const root = this.contentEl;
+    if (!vv || !root) return;
+    root.style.height = `${Math.round(vv.height)}px`;
   }
 
   settingsChanged(settings: PocketOracleSettings): void {
