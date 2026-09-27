@@ -415,3 +415,39 @@ a.po-run-button:active {
   background: var(--po-gold-deep, #d4a843);
   border-color: var(--po-gold, #e8c76a);
 }
+
+
+/* Node-terminal canvas node-tap buttons — `[▶ Open X](po-open:X)` links get
+   this treatment via the open-term post-processor. Same visual language as
+   .po-run-button (task buttons) so both read as one family of canvas action. */
+a.po-open-button {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 10px;
+  background: var(--po-purple-deep, #7c5cc0);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  border: 1px solid var(--po-purple, #c8a2ff);
+  transition: transform 0.08s ease, box-shadow 0.15s ease;
+}
+a.po-open-button:hover {
+  box-shadow: 0 0 12px rgba(200, 162, 255, 0.5);
+}
+a.po-open-button:active {
+  transform: scale(0.96);
+  background: var(--po-gold-deep, #d4a843);
+  border-color: var(--po-gold, #e8c76a);
+}
+
+/* Node-terminal full-screen (iPad) — hide the tab header chrome while a
+   po-term view is the active leaf. Toggled by open-term.ts's
+   registerFullScreenSync on active-leaf-change; NOT applied via
+   openPopoutLeaf/moveLeafToPopout, which throw on mobile. `.workspace-tab-
+   header-container` is an Obsidian internal class (undocumented but stable
+   across recent releases) — if a future Obsidian update renames it, the
+   worst case is the tab header stays visible, not a broken terminal. */
+body.po-term-fullscreen .workspace-tab-header-container {
+  display: none !important;
+}

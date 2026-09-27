@@ -18,9 +18,10 @@ import { Notice, Plugin, requestUrl } from "obsidian";
  * re-scanning on canvas layout events since cards paint before plugins load.
  */
 
+import { SLUG_CHARS, SLUG_RE, slugCapture } from "./slug";
+
 const LEGACY_LINK_PREFIX = "po-run:";
 const PROTO_PREFIX = "obsidian://po-run";
-const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,40}$/;
 const UPGRADED = "poRunUpgraded"; // dataset marker, guards against double-processing
 
 /** POST {slug} to the broker's /po/run and surface the one-word result as a Notice. */
@@ -67,14 +68,16 @@ function runResultMessage(slug: string, result: string): string {
   }
 }
 
-/** Pull a slug from `po-run:<slug>`, `obsidian://po-run?slug=<slug>`, or a bare-slug line. */
+/** Pull a slug from `po-run:<slug>`, `obsidian://po-run?slug=<slug>`, or a bare-slug line.
+ *  Case-preserving — mixed-case project slugs (`LookingGlass`, `AFHC-AI-Training`)
+ *  are valid on the shell side, so this must not normalize case. */
 export function extractSlug(text: string): string | null {
-  const proto = text.match(/obsidian:\/\/po-run\?slug=([a-z0-9][a-z0-9-]{0,40})/i);
-  if (proto) return proto[1].toLowerCase();
-  const link = text.match(/po-run:([a-z0-9][a-z0-9-]{0,40})/i);
-  if (link) return link[1].toLowerCase();
-  const bare = text.trim().match(/^([a-z0-9][a-z0-9-]{0,40})$/i);
-  return bare ? bare[1].toLowerCase() : null;
+  const proto = text.match(slugCapture("obsidian://po-run\\?slug="));
+  if (proto) return proto[1];
+  const link = text.match(slugCapture(LEGACY_LINK_PREFIX));
+  if (link) return link[1];
+  const bare = text.trim().match(new RegExp(`^(${SLUG_CHARS})$`));
+  return bare ? bare[1] : null;
 }
 
 /**
@@ -85,7 +88,7 @@ export function extractSlug(text: string): string | null {
  */
 export function registerRunProtocol(plugin: Plugin, getBase: () => string): void {
   plugin.registerObsidianProtocolHandler("po-run", (params) => {
-    const slug = (params.slug || "").toLowerCase();
+    const slug = params.slug || "";
     if (!slug) {
       new Notice("PocketOracle: po-run link had no slug.");
       return;
