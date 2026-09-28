@@ -169,6 +169,22 @@ export class PocketOracleTerminalView extends ItemView {
     this.term = term;
     this.fit = fit;
 
+    // Shift+Enter = insert a newline instead of submitting (raised 2026-09-27
+    // Sunday AAR). Bare Enter sends CR (submit); Claude Code's TUI reads a bare
+    // LF (Ctrl+J) as a literal newline, no terminal-setup required — the same
+    // sequence the per-project node terminals already use (node-terminal-
+    // view.ts). Map Shift+Enter to it so multi-line prompts compose in the pane
+    // without a hardware Option key. Returning false stops xterm from also
+    // emitting the default CR.
+    term.attachCustomKeyEventHandler((ev) => {
+      if (ev.type === "keydown" && ev.key === "Enter" && ev.shiftKey) {
+        ev.preventDefault();
+        this.client?.sendInput("\n");
+        return false;
+      }
+      return true;
+    });
+
     // Shift+Enter = newline, not submit. xterm sends CR ("\r") for Enter
     // regardless of the shift modifier, and Claude Code's TUI reads a bare CR as
     // "submit". To compose a multi-line prompt in the pane we intercept
