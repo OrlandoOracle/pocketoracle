@@ -169,6 +169,21 @@ export class PocketOracleTerminalView extends ItemView {
     this.term = term;
     this.fit = fit;
 
+    // Shift+Enter = newline, not submit. xterm sends CR ("\r") for Enter
+    // regardless of the shift modifier, and Claude Code's TUI reads a bare CR as
+    // "submit". To compose a multi-line prompt in the pane we intercept
+    // Shift+Enter and send a bare LF ("\n") instead — the same char /terminal-setup
+    // binds — which the TUI inserts as a newline rather than submitting. Works both
+    // in a plain shell and when the pane feeds the live claude TUI.
+    term.attachCustomKeyEventHandler((ev) => {
+      if (ev.type === "keydown" && ev.key === "Enter" && ev.shiftKey) {
+        ev.preventDefault();
+        this.client?.sendInput("\n");
+        return false;
+      }
+      return true;
+    });
+
     // Copy-on-select: the iPad has no highlight-to-copy, so mirror the desktop
     // behaviour by writing the selection to the device clipboard on pointerup.
     // pointerup fires once at the end of the drag and carries the transient

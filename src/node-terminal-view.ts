@@ -241,6 +241,18 @@ export class PoTermView extends ItemView {
     this.term = term;
     this.fit = fit;
 
+    // Shift+Enter = newline, not submit (see terminal-view.ts for the rationale):
+    // send a bare LF so Claude Code's TUI inserts a newline instead of reading the
+    // default CR as a submit.
+    term.attachCustomKeyEventHandler((ev) => {
+      if (ev.type === "keydown" && ev.key === "Enter" && ev.shiftKey) {
+        ev.preventDefault();
+        this.client?.sendInput("\n");
+        return false;
+      }
+      return true;
+    });
+
     this.hostEl.addEventListener("pointerup", () => {
       if (!this.settings.copyOnSelect) return;
       const sel = term.getSelection();
