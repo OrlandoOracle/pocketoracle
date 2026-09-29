@@ -65,7 +65,7 @@ export default class PocketOraclePlugin extends Plugin {
     registerFullScreenSync(this);
     this.addCommand({
       id: "open-canvas-node-terminal",
-      name: "Open project terminal (pick from canvas)",
+      name: "Open a project terminal",
       callback: () => void openActiveCanvasNodeTerminal(this),
     });
 

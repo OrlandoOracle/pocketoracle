@@ -1,4 +1,4 @@
-import { Notice, Plugin, SuggestModal, type App, type TFile, type WorkspaceLeaf } from "obsidian";
+import { Notice, Plugin, SuggestModal, TFolder, type App, type TFile, type WorkspaceLeaf } from "obsidian";
 import { SLUG_CHARS, SLUG_RE, slugCapture } from "./slug";
 import { PoTermView, VIEW_TYPE_PO_TERM } from "./node-terminal-view";
 
@@ -318,12 +318,33 @@ class PoSlugSuggestModal extends SuggestModal<string> {
   }
 }
 
+/** Every `01-Projects/<slug>` folder name that is a valid slug — the reliable,
+ *  canvas-INDEPENDENT project list. Reads the loaded file tree, which is present
+ *  identically on mobile and desktop, so it never comes up empty on iPad the way
+ *  a canvas read does: the canvas file may not even be synced to the device (the
+ *  iPad's LiveSync vault had no Life.canvas at all — 2026-09-29). Sorted. */
+function projectFolderSlugs(app: App): string[] {
+  const out: string[] = [];
+  for (const f of app.vault.getAllLoadedFiles()) {
+    if (
+      f instanceof TFolder &&
+      f.parent &&
+      f.parent.path.toLowerCase() === "01-projects" &&
+      SLUG_RE.test(f.name)
+    ) {
+      out.push(f.name);
+    }
+  }
+  return out.sort((a, b) => a.localeCompare(b));
+}
+
 /** Command: open a per-project node terminal. Mobile-proof — prefers a genuine
- *  desktop canvas selection when one exists, but otherwise reads the active
- *  `.canvas` file for its po-open slugs and offers a tap-picker. This is the
- *  launch path that WORKS on iPad, where the whole-card tap never reaches the
- *  plugin and the selection API is empty; mirrors `runActiveCanvasNode`'s intent
- *  in run-task.ts without inheriting its desktop-only assumptions. */
+ *  desktop canvas selection when one exists, but otherwise builds a tap-picker
+ *  from the vault's 01-Projects/<slug> folders (always readable on mobile) merged
+ *  with any po-open nodes in the active canvas. Decoupled from canvas content on
+ *  purpose: the whole-card tap never reaches the plugin on iOS, the selection API
+ *  is empty on mobile, AND the canvas file itself may not be synced to the device
+ *  — so the folder list is the one source that is always present. */
 export async function openActiveCanvasNodeTerminal(plugin: Plugin): Promise<void> {
   // Fast path — desktop: a genuinely selected canvas node carrying a po-open slug.
   const view = (plugin.app.workspace as { activeLeaf?: { view?: unknown } }).activeLeaf?.view as
@@ -347,20 +368,26 @@ export async function openActiveCanvasNodeTerminal(plugin: Plugin): Promise<void
     }
   }
 
-  // Mobile / no-selection path — parse the active canvas FILE for po-open slugs.
+  // Mobile / no-selection path. Merge TWO slug sources so it never dead-ends:
+  //   1. the active canvas file's po-open nodes (best-effort — may be empty, or
+  //      the canvas may not even be synced to this device);
+  //   2. the vault's 01-Projects/<slug> folders — ALWAYS present on mobile.
+  // Source 2 is the fix for the iPad, where a canvas-only read found nothing.
+  const slugs = new Set<string>();
   const file = plugin.app.workspace.getActiveFile();
-  if (!file || file.extension !== "canvas") {
-    new Notice("PocketOracle: open a Canvas with po-open:<slug> nodes, then run this.");
+  if (file && file.extension === "canvas") {
+    for (const s of await slugsInCanvasFile(plugin.app, file)) slugs.add(s);
+  }
+  for (const s of projectFolderSlugs(plugin.app)) slugs.add(s);
+
+  const list = [...slugs];
+  if (list.length === 0) {
+    new Notice("PocketOracle: no projects found under 01-Projects/ to open.");
     return;
   }
-  const slugs = await slugsInCanvasFile(plugin.app, file);
-  if (slugs.length === 0) {
-    new Notice("PocketOracle: no po-open:<slug> nodes found in this canvas.");
+  if (list.length === 1) {
+    void openTerminalForSlug(plugin, list[0]);
     return;
   }
-  if (slugs.length === 1) {
-    void openTerminalForSlug(plugin, slugs[0]);
-    return;
-  }
-  new PoSlugSuggestModal(plugin.app, slugs, (slug) => void openTerminalForSlug(plugin, slug)).open();
+  new PoSlugSuggestModal(plugin.app, list, (slug) => void openTerminalForSlug(plugin, slug)).open();
 }
