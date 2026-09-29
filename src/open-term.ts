@@ -174,16 +174,24 @@ export function registerOpenLinks(plugin: Plugin): void {
  * Slice-2 — whole-card tap-to-launch. Makes the ENTIRE canvas node a launch
  * target (springboard feel), not just a link rendered inside it.
  *
- * Robust by construction, per the research §(d)/footgun-14 ruling: this touches
- * NO canvas runtime internals (`canvas.nodes`, monkey-patched onDoubleClick) —
- * those break on Obsidian updates and turn double-click into double-tap on
- * touch. It is a single capturing `document` click listener that reasons purely
- * over the rendered DOM:
+ * Rides on POINTER events, not `click`: on iOS the canvas swallows the synthetic
+ * `click` before it reaches a document listener (this is why the command-driven
+ * picker exists as a fallback), but the lower-level `pointerup` propagates. Per
+ * the 2026-09-29 decision "canvas whole-card TAP -> same launch, via pointerup
+ * not the iOS-swallowed click", this is the path that makes the springboard work
+ * on the iPad, not just the desktop.
  *
- *   - A clean click (press+release, no drag) is the "open" intent. Dragging a
- *     card to move it fires pointer/drag events, NOT click — so tap-to-open and
- *     drag-to-move never collide, and there's no double-tap gesture to fight the
- *     canvas's own double-click-to-edit.
+ * Robust by construction, per the research §(d)/footgun-14 ruling: it touches NO
+ * canvas runtime internals (`canvas.nodes`, monkey-patched onDoubleClick) —
+ * those break on Obsidian updates and turn double-click into double-tap on
+ * touch. It is a pair of capturing `document` pointer listeners that reason
+ * purely over the rendered DOM:
+ *
+ *   - A clean TAP (pointerdown then pointerup at ~the same spot within a short
+ *     window) is the "open" intent. Dragging a card to move it, or a text
+ *     drag-select, travels past the tolerance and is left to the canvas
+ *     untouched — so tap-to-open and drag-to-move never collide, and there's no
+ *     double-tap gesture to fight the canvas's own double-click-to-edit.
  *   - The slug comes from the tapped `.canvas-node`'s rendered text via the same
  *     `extractSlug` the link path uses, so a bare `po-open:<slug>` line, an
  *     inline-code token, or a full markdown link all work identically.
@@ -192,19 +200,57 @@ export function registerOpenLinks(plugin: Plugin): void {
  *
  * Guards: never fires while the node is being text-edited (an open editor would
  * mean the user is typing, not launching), and yields to the per-link
- * `.po-open-button` handler so a click that lands on an actual upgraded link
+ * `.po-open-button` handler so a tap that lands on an actual upgraded link
  * isn't double-dispatched.
  */
 export function registerCanvasNodeTap(plugin: Plugin): void {
+  const TAP_MOVE_TOL = 10; // px of travel still counts as a tap, not a drag
+  const TAP_TIME_TOL = 700; // ms; a longer press is a long-press/context, not a launch
+  const starts = new Map<number, { x: number; y: number; t: number }>();
+
   plugin.registerDomEvent(
     document,
-    "click",
-    (ev: MouseEvent) => {
+    "pointerdown",
+    (ev: PointerEvent) => {
+      starts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY, t: ev.timeStamp });
+    },
+    { capture: true },
+  );
+
+  // iOS scroll/gesture takeover fires pointercancel — drop the pending start so
+  // a later pointerup can't be mistaken for a tap.
+  plugin.registerDomEvent(
+    document,
+    "pointercancel",
+    (ev: PointerEvent) => {
+      starts.delete(ev.pointerId);
+    },
+    { capture: true },
+  );
+
+  plugin.registerDomEvent(
+    document,
+    "pointerup",
+    (ev: PointerEvent) => {
+      const start = starts.get(ev.pointerId);
+      starts.delete(ev.pointerId);
+      if (!start) return;
+
+      // Drag-to-move / drag-select / long-press → not a launch; leave native
+      // canvas behaviour intact.
+      if (
+        Math.abs(ev.clientX - start.x) > TAP_MOVE_TOL ||
+        Math.abs(ev.clientY - start.y) > TAP_MOVE_TOL ||
+        ev.timeStamp - start.t > TAP_TIME_TOL
+      ) {
+        return;
+      }
+
       const target = ev.target as HTMLElement | null;
       if (!target) return;
 
       // Yield to any interactive element inside the card — a po-open button, a
-      // po-run task link, or any other anchor/button. Those own their own click
+      // po-run task link, or any other anchor/button. Those own their own tap
       // (e.g. nMeals' `[▶ Run grocery]` po-run link), so a tap on them must NOT
       // also whole-card-launch a terminal. Only a tap on the card BODY launches.
       if (target.closest("a, button, .po-open-button, .po-run-button")) return;
