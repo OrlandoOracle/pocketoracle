@@ -65,8 +65,8 @@ export default class PocketOraclePlugin extends Plugin {
     registerFullScreenSync(this);
     this.addCommand({
       id: "open-canvas-node-terminal",
-      name: "Open canvas node terminal",
-      callback: () => openActiveCanvasNodeTerminal(this),
+      name: "Open project terminal (pick from canvas)",
+      callback: () => void openActiveCanvasNodeTerminal(this),
     });
 
     // The ask-loop runs at plugin level (not per-pane) so Claude's questions pop

@@ -1,4 +1,4 @@
-import { Notice, Plugin, type WorkspaceLeaf } from "obsidian";
+import { Notice, Plugin, SuggestModal, type App, type TFile, type WorkspaceLeaf } from "obsidian";
 import { SLUG_CHARS, SLUG_RE, slugCapture } from "./slug";
 import { PoTermView, VIEW_TYPE_PO_TERM } from "./node-terminal-view";
 
@@ -261,39 +261,106 @@ function slugFromCard(card: HTMLElement): string | null {
   return null;
 }
 
-/** Fallback command: open the terminal for the currently-selected Canvas node,
- *  mirroring `runActiveCanvasNode` in run-task.ts. */
-export function openActiveCanvasNodeTerminal(plugin: Plugin): void {
+/** Extract every distinct po-open slug from a `.canvas` file's node texts by
+ *  reading the file JSON directly — NOT the canvas runtime. This is the whole
+ *  point: on mobile `view.canvas.selection` is empty and the canvas node API is
+ *  unavailable, so the desktop selection path (below) silently yields nothing.
+ *  The on-disk `.canvas` is plain JSON and reads identically on every platform.
+ *  Order-preserving, deduped. */
+async function slugsInCanvasFile(app: App, file: TFile): Promise<string[]> {
+  let raw: string;
+  try {
+    raw = await app.vault.read(file);
+  } catch {
+    return [];
+  }
+  let data: { nodes?: Array<{ text?: unknown }> };
+  try {
+    data = JSON.parse(raw) as { nodes?: Array<{ text?: unknown }> };
+  } catch {
+    return [];
+  }
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const node of data.nodes ?? []) {
+    const text = typeof node?.text === "string" ? node.text : "";
+    if (!text) continue;
+    const slug = extractSlug(text);
+    if (slug && SLUG_RE.test(slug) && !seen.has(slug)) {
+      seen.add(slug);
+      out.push(slug);
+    }
+  }
+  return out;
+}
+
+/** A tap-picker of project slugs — the mobile-robust launch path. Command-driven,
+ *  so it never depends on a canvas click reaching the plugin (iOS canvas swallows
+ *  the synthetic click) nor on `canvas.selection` (empty on mobile). */
+class PoSlugSuggestModal extends SuggestModal<string> {
+  constructor(
+    app: App,
+    private slugs: string[],
+    private onChoose: (slug: string) => void,
+  ) {
+    super(app);
+    this.setPlaceholder("Open which project terminal?");
+  }
+  getSuggestions(query: string): string[] {
+    const q = query.trim().toLowerCase();
+    return q ? this.slugs.filter((s) => s.toLowerCase().includes(q)) : this.slugs;
+  }
+  renderSuggestion(slug: string, el: HTMLElement): void {
+    el.createEl("div", { text: slug });
+  }
+  onChooseSuggestion(slug: string): void {
+    this.onChoose(slug);
+  }
+}
+
+/** Command: open a per-project node terminal. Mobile-proof — prefers a genuine
+ *  desktop canvas selection when one exists, but otherwise reads the active
+ *  `.canvas` file for its po-open slugs and offers a tap-picker. This is the
+ *  launch path that WORKS on iPad, where the whole-card tap never reaches the
+ *  plugin and the selection API is empty; mirrors `runActiveCanvasNode`'s intent
+ *  in run-task.ts without inheriting its desktop-only assumptions. */
+export async function openActiveCanvasNodeTerminal(plugin: Plugin): Promise<void> {
+  // Fast path — desktop: a genuinely selected canvas node carrying a po-open slug.
   const view = (plugin.app.workspace as { activeLeaf?: { view?: unknown } }).activeLeaf?.view as
     | { getViewType?: () => string; canvas?: { selection?: Set<unknown> } }
     | undefined;
-  if (!view || view.getViewType?.() !== "canvas") {
-    new Notice("PocketOracle: open a Canvas and select a node first.");
-    return;
-  }
-  const sel = view.canvas?.selection;
-  if (!sel || sel.size === 0) {
-    new Notice("PocketOracle: select a canvas node with a po-open:<slug> link.");
-    return;
-  }
-  let text = "";
-  for (const node of sel) {
-    const n = node as { text?: unknown; getData?: () => { text?: unknown } };
-    const t =
-      typeof n.text === "string"
-        ? n.text
-        : typeof n.getData === "function" && typeof n.getData()?.text === "string"
-          ? (n.getData()!.text as string)
-          : "";
-    if (t) {
-      text = t;
-      break;
+  const sel = view?.getViewType?.() === "canvas" ? view?.canvas?.selection : undefined;
+  if (sel && sel.size > 0) {
+    for (const node of sel) {
+      const n = node as { text?: unknown; getData?: () => { text?: unknown } };
+      const t =
+        typeof n.text === "string"
+          ? n.text
+          : typeof n.getData === "function" && typeof n.getData()?.text === "string"
+            ? (n.getData()!.text as string)
+            : "";
+      const slug = t ? extractSlug(t) : null;
+      if (slug) {
+        void openTerminalForSlug(plugin, slug);
+        return;
+      }
     }
   }
-  const slug = extractSlug(text);
-  if (!slug) {
-    new Notice("PocketOracle: no po-open:<slug> found in the selected node.");
+
+  // Mobile / no-selection path — parse the active canvas FILE for po-open slugs.
+  const file = plugin.app.workspace.getActiveFile();
+  if (!file || file.extension !== "canvas") {
+    new Notice("PocketOracle: open a Canvas with po-open:<slug> nodes, then run this.");
     return;
   }
-  void openTerminalForSlug(plugin, slug);
+  const slugs = await slugsInCanvasFile(plugin.app, file);
+  if (slugs.length === 0) {
+    new Notice("PocketOracle: no po-open:<slug> nodes found in this canvas.");
+    return;
+  }
+  if (slugs.length === 1) {
+    void openTerminalForSlug(plugin, slugs[0]);
+    return;
+  }
+  new PoSlugSuggestModal(plugin.app, slugs, (slug) => void openTerminalForSlug(plugin, slug)).open();
 }
