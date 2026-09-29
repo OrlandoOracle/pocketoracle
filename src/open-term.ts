@@ -1,6 +1,7 @@
 import { Notice, Plugin, SuggestModal, TFolder, type App, type TFile, type WorkspaceLeaf } from "obsidian";
 import { SLUG_CHARS, SLUG_RE, slugCapture } from "./slug";
 import { PoTermView, VIEW_TYPE_PO_TERM } from "./node-terminal-view";
+import { runTask, extractSlug as extractRunSlug } from "./run-task";
 
 /**
  * Canvas node → per-project tmux terminal. Clones the `run-task.ts` `po-run:`
@@ -19,6 +20,8 @@ import { PoTermView, VIEW_TYPE_PO_TERM } from "./node-terminal-view";
 
 const LEGACY_LINK_PREFIX = "po-open:";
 const PROTO_PREFIX = "obsidian://po-open";
+const RUN_LEGACY_LINK_PREFIX = "po-run:";
+const RUN_PROTO_PREFIX = "obsidian://po-run";
 const UPGRADED = "poOpenUpgraded"; // dataset marker, guards against double-processing
 const FULLSCREEN_BODY_CLASS = "po-term-fullscreen";
 
@@ -195,15 +198,19 @@ export function registerOpenLinks(plugin: Plugin): void {
  *   - The slug comes from the tapped `.canvas-node`'s rendered text via the same
  *     `extractSlug` the link path uses, so a bare `po-open:<slug>` line, an
  *     inline-code token, or a full markdown link all work identically.
- *   - Cards with no `po-open:` token are left completely alone (returns null),
- *     so mixed canvases (Life.canvas) keep normal select/drag behaviour.
+ *   - BOTH card kinds launch (2026-09-29 decision "any card tappable"): a
+ *     `po-open:<slug>` card opens a per-project terminal; a `po-run:<slug>` card
+ *     fires its headless task (the grocery-style modal loop) via the broker. A
+ *     card carrying a po-open marker wins if it somehow has both.
+ *   - Cards with neither token are left completely alone (returns null), so
+ *     mixed canvases (Life.canvas) keep normal select/drag behaviour.
  *
  * Guards: never fires while the node is being text-edited (an open editor would
  * mean the user is typing, not launching), and yields to the per-link
- * `.po-open-button` handler so a tap that lands on an actual upgraded link
- * isn't double-dispatched.
+ * `.po-open-button` / `.po-run-button` handlers so a tap that lands on an actual
+ * upgraded link isn't double-dispatched.
  */
-export function registerCanvasNodeTap(plugin: Plugin): void {
+export function registerCanvasNodeTap(plugin: Plugin, getBase: () => string): void {
   const TAP_MOVE_TOL = 10; // px of travel still counts as a tap, not a drag
   const TAP_TIME_TOL = 700; // ms; a longer press is a long-press/context, not a launch
   const starts = new Map<number, { x: number; y: number; t: number }>();
@@ -273,12 +280,23 @@ export function registerCanvasNodeTap(plugin: Plugin): void {
         return;
       }
 
-      const slug = slugFromCard(card);
-      if (!slug) return; // not a launch tile — leave native select/drag intact
+      const openSlug = slugFromCard(card);
+      if (openSlug) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        void openTerminalForSlug(plugin, openSlug);
+        return;
+      }
 
-      ev.preventDefault();
-      ev.stopPropagation();
-      void openTerminalForSlug(plugin, slug);
+      const runSlug = runSlugFromCard(card);
+      if (runSlug) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        void runTask(getBase(), runSlug);
+        return;
+      }
+
+      // Neither a po-open nor a po-run tile — leave native select/drag intact.
     },
     { capture: true },
   );
@@ -304,6 +322,31 @@ function slugFromCard(card: HTMLElement): string | null {
   // single-word title card into an accidental launch tile.
   const text = (card.textContent || "").trim();
   if (text.includes(LEGACY_LINK_PREFIX)) return extractSlug(text);
+  return null;
+}
+
+/** Pull a po-run slug out of a rendered canvas card — same strategy as
+ *  `slugFromCard`, but for the headless-task trigger (`po-run:<slug>` /
+ *  `obsidian://po-run?slug=`). Used by the whole-card tap so a grocery-style task
+ *  card fires on a body tap too, not just its `[▶ Run]` link. Case-preserving. */
+function runSlugFromCard(card: HTMLElement): string | null {
+  const link = card.querySelector<HTMLAnchorElement>(
+    `a[href^="${RUN_PROTO_PREFIX}"], a[href^="${RUN_LEGACY_LINK_PREFIX}"]`,
+  );
+  if (link) {
+    const s = extractRunSlug(link.getAttribute("href") || "");
+    if (s) return s;
+  }
+  for (const code of Array.from(card.querySelectorAll<HTMLElement>("code"))) {
+    const s = extractRunSlug((code.textContent || "").trim());
+    if (s) return s;
+  }
+  // Whole-card text fallback, but ONLY when an explicit po-run marker is present
+  // — never the bare-slug branch, which would turn any title card into a task tile.
+  const text = (card.textContent || "").trim();
+  if (text.includes(RUN_LEGACY_LINK_PREFIX) || text.includes(RUN_PROTO_PREFIX)) {
+    return extractRunSlug(text);
+  }
   return null;
 }
 

@@ -61,7 +61,7 @@ export default class PocketOraclePlugin extends Plugin {
     // Same reliable-click-path pattern as po-run above.
     registerOpenProtocol(this);
     registerOpenLinks(this);
-    registerCanvasNodeTap(this); // Slice-2: whole-card tap-to-launch
+    registerCanvasNodeTap(this, () => this.brokerBase()); // Slice-2: whole-card tap (po-open opens, po-run fires)
     registerFullScreenSync(this);
     this.addCommand({
       id: "open-canvas-node-terminal",
