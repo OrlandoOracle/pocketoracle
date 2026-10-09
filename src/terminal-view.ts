@@ -242,9 +242,13 @@ export class PocketOracleTerminalView extends ItemView {
     // data too). registerDomEvent auto-removes these on view close.
     this.registerDomEvent(document, "visibilitychange", () => {
       if (document.visibilityState === "visible") this.forceReconnect();
+      else this.suspend();
     });
     // A network flap (Wi-Fi ↔ cellular, tunnel re-up) — reconnect on return.
-    this.registerDomEvent(window, "online", () => this.forceReconnect());
+    // Not while hidden: the foreground return reconnects.
+    this.registerDomEvent(window, "online", () => {
+      if (document.visibilityState === "visible") this.forceReconnect();
+    });
 
     // Watchdog for the foreground case: a socket that goes dead without firing
     // onclose (readyState stuck, or bytes that never flush).
@@ -264,6 +268,18 @@ export class PocketOracleTerminalView extends ItemView {
     this.client?.close();
     this.client = null;
     this.connect();
+  }
+
+  /** Drop the socket and every pending retry while the app is hidden, so a
+   *  backgrounded device holds no connection and streams no output. The
+   *  visibilitychange handler reconnects on return, which it did anyway. */
+  private suspend(): void {
+    if (this.reconnectTimer != null) {
+      window.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.client?.close();
+    this.client = null;
   }
 
   /** Liveness probe. Skips while hidden (visibilitychange handles the return).
@@ -379,6 +395,7 @@ export class PocketOracleTerminalView extends ItemView {
 
   private scheduleReconnect(): void {
     if (this.reconnectTimer != null) return;
+    if (document.visibilityState !== "visible") return; // suspended; return reconnects
     // Exponential backoff with a cap + jitter so a long outage doesn't hammer
     // the gateway, but a brief flap still recovers in ~1s.
     const delay = this.backoffMs + Math.floor(Math.random() * 300);

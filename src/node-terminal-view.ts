@@ -203,8 +203,11 @@ export class PoTermView extends ItemView {
 
     this.registerDomEvent(document, "visibilitychange", () => {
       if (document.visibilityState === "visible") this.forceReconnect();
+      else this.suspend();
     });
-    this.registerDomEvent(window, "online", () => this.forceReconnect());
+    this.registerDomEvent(window, "online", () => {
+      if (document.visibilityState === "visible") this.forceReconnect();
+    });
   }
 
   /**
@@ -329,6 +332,18 @@ export class PoTermView extends ItemView {
     this.connect(nodeUrl);
   }
 
+  /** Drop the socket and every pending retry while the app is hidden, so a
+   *  backgrounded device holds no connection and streams no output. The
+   *  visibilitychange handler reconnects on return, which it did anyway. */
+  private suspend(): void {
+    if (this.reconnectTimer != null) {
+      window.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.client?.close();
+    this.client = null;
+  }
+
   private heartbeat(): void {
     if (this.disposed || document.visibilityState !== "visible") return;
     const client = this.client;
@@ -390,6 +405,7 @@ export class PoTermView extends ItemView {
 
   private scheduleReconnect(nodeUrl: string): void {
     if (this.reconnectTimer != null) return;
+    if (document.visibilityState !== "visible") return; // suspended; return reconnects
     const delay = this.backoffMs + Math.floor(Math.random() * 300);
     this.backoffMs = Math.min(this.backoffMs * 2, RECONNECT_CAP_MS);
     this.reconnectTimer = window.setTimeout(() => {

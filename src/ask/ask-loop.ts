@@ -14,6 +14,11 @@ import type { PendingAsk, Answers } from "./types";
  * and the visibilitychange kick directly fixes the iOS-backgrounding trust-killer
  * (a socket that went zombie while the app was backgrounded would silently miss
  * a doorbell; a fresh poll on resume cannot).
+ *
+ * Battery: the timer only runs while the app is visible. Hidden = no polling at
+ * all, so a backgrounded device stops waking its radio every pollMs. The broker's
+ * presence window then lapses and /po/ask 409s "no-device" — the hook falls back
+ * to the TUI, which is the honest answer for a device nobody is looking at.
  */
 export class AskLoop {
   private app: App;
@@ -32,7 +37,8 @@ export class AskLoop {
    */
   private closed = new Set<string>();
   private onVisibility = (): void => {
-    if (document.visibilityState === "visible") void this.pollOnce();
+    if (document.visibilityState === "visible") this.resume();
+    else this.pause();
   };
 
   constructor(app: App, brokerBase: string, opts: { ttlMs: number; pollMs: number }) {
@@ -44,13 +50,26 @@ export class AskLoop {
 
   start(): void {
     if (this.timer != null) return;
+    document.removeEventListener("visibilitychange", this.onVisibility);
     this.stopped = false;
     document.addEventListener("visibilitychange", this.onVisibility);
+    if (document.visibilityState === "visible") this.resume();
+  }
+
+  /** Poll now and keep polling every pollMs. No-op if already running. */
+  private resume(): void {
+    if (this.stopped || this.timer != null) return;
     const tick = (): void => {
       void this.pollOnce();
       this.timer = window.setTimeout(tick, this.pollMs);
     };
     tick();
+  }
+
+  /** Stop the timer while hidden. Open modals stay; the next resume reconciles. */
+  private pause(): void {
+    if (this.timer != null) window.clearTimeout(this.timer);
+    this.timer = null;
   }
 
   stop(): void {
