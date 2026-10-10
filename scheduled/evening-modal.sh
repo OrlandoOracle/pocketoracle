@@ -60,10 +60,17 @@ if [ "$((10#$HOUR))" -lt "$START_HOUR" ]; then
   exit 0
 fi
 
-# 3. Session already running? Leave it — unless it's stalled on a permission prompt.
+# 3. Session already running? Leave it — unless it's stalled on a permission prompt,
+# or it is a leftover from a PREVIOUS day (an unanswered ask falls back to the TUI and
+# sits there forever, which would no-op every later evening).
 if tmux has-session -t "$SESSION" 2>/dev/null; then
   PANE="$(tmux capture-pane -p -t "$SESSION" 2>/dev/null | tail -30)"
-  if echo "$PANE" | grep -q "Do you want to proceed?"; then
+  CREATED_EPOCH="$(tmux display-message -p -t "$SESSION" '#{session_created}' 2>/dev/null)"
+  CREATED_DAY="$(date -r "${CREATED_EPOCH:-0}" +%F 2>/dev/null)"
+  if [ -n "$CREATED_EPOCH" ] && [ "$CREATED_DAY" != "$TODAY" ]; then
+    say "STALE session from $CREATED_DAY — killing so today's close can fire"
+    tmux kill-session -t "$SESSION" 2>/dev/null
+  elif echo "$PANE" | grep -q "Do you want to proceed?"; then
     say "STALLED on a permission prompt — killing so the next tick re-fires clean"
     tmux kill-session -t "$SESSION" 2>/dev/null
   else
